@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 - Tag Power</title>
+    <title>智聯書籤系統 - Bookmark Editor</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
@@ -26,35 +26,36 @@
         .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 4px; background: #e2e8f0; color: var(--gray); margin-bottom: 10px; display: inline-block; font-weight: 600; }
         
         .search-box { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; margin-bottom: 15px; box-sizing: border-box; outline: none; }
-        .search-box:focus { border-color: var(--primary); }
 
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        button { cursor: pointer; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; transition: all 0.2s; font-size: 14px; }
+        button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 14px; font-weight: 600; transition: all 0.2s; font-size: 14px; display: flex; align-items: center; gap: 4px; }
         .btn-add { background: var(--primary); color: white; }
         .btn-sync { background: var(--success); color: white; }
         .btn-tag-toggle { background: var(--gray); color: white; }
-        .btn-active-filter { background: #f59e0b; color: white; }
 
-        /* 摺疊標籤面板 */
+        /* 標籤面板 */
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
-        .tag-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
         .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
-        .tag-pill { background: white; border: 1px solid #cbd5e1; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; display: flex; align-items: center; }
-        .tag-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .tag-count { font-size: 10px; opacity: 0.6; margin-left: 5px; }
-        
-        /* 新增標籤小按鈕 */
-        .btn-tag-add { background: #e2e8f0; color: #475569; padding: 4px 10px; font-size: 12px; border-radius: 4px; border: 1px solid #cbd5e1; }
-        .btn-tag-add:hover { background: #cbd5e1; }
+        .tag-pill { background: white; border: 1px solid #cbd5e1; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; }
+        .tag-pill.active { background: var(--primary); color: white; }
 
-        /* 書籤內容樣式 */
+        /* 書籤內容 */
         .folder-node { margin: 15px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); }
         .folder-header { cursor: pointer; padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; }
         .folder-children { min-height: 40px; padding: 5px 5px 15px 25px; background: white; border-top: 1px solid #f1f5f9; }
+        
         .link-node { padding: 10px 15px; margin: 6px 0; background: white; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; }
-        .link-node a { text-decoration: none; color: var(--primary); flex-grow: 1; font-weight: 500; }
+        .link-node a { text-decoration: none; color: var(--primary); flex-grow: 1; font-weight: 500; font-size: 15px; }
+        
         .tag-item { background: var(--tag-bg); color: var(--tag-text); font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-weight: bold; }
-        .btn-del { color: var(--danger); background: none; font-size: 12px; margin-left: 10px; }
+        
+        /* 功能按鈕組 */
+        .action-btns { display: flex; gap: 5px; margin-left: 10px; opacity: 0.6; transition: 0.3s; }
+        .link-node:hover .action-btns { opacity: 1; }
+        .btn-icon { background: none; color: var(--gray); font-size: 16px; padding: 4px; }
+        .btn-icon:hover { color: var(--primary); }
+        .btn-icon.del:hover { color: var(--danger); }
+
         .ghost { opacity: 0.2; background: #dbeafe !important; }
     </style>
 </head>
@@ -62,29 +63,23 @@
 
 <div class="container">
     <div class="header-bar">
-        <h1>智聯書籤系統 v2.4</h1>
-        <div id="syncStatus" class="status-badge">資料同步中...</div>
-        
+        <h1>智聯書籤系統 v2.5</h1>
+        <div id="syncStatus" class="status-badge">資料載入中...</div>
         <input type="text" id="searchInput" class="search-box" placeholder="搜尋書籤..." oninput="refreshUI()">
-        
         <div class="controls">
             <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
             <button class="btn-add" onclick="addNewItem('link')">🔗 書籤</button>
-            <button id="tagBtn" class="btn-tag-toggle" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
+            <button id="tagBtn" class="btn-tag-toggle" onclick="toggleTagPanel()">🏷️ 標籤篩選</button>
             <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
         </div>
     </div>
 
     <div id="tagPanel">
-        <div class="tag-panel-header">
-            <div>
-                <span style="font-weight: bold; color: var(--gray);">標籤雲管理</span>
-                <button class="btn-tag-add" style="margin-left: 10px;" onclick="createStandaloneTag()">➕ 新增標籤</button>
-            </div>
-            <span style="cursor:pointer; color: var(--primary); font-size: 13px;" onclick="clearFilter()">清除過濾</span>
+        <div style="font-size: 13px; font-weight: bold; margin-bottom: 10px; color: var(--gray); display: flex; justify-content: space-between;">
+            <span>過濾標籤：</span>
+            <span style="cursor:pointer; color: var(--primary);" onclick="clearFilter()">清除</span>
         </div>
-        <div id="tagCloud" class="tag-cloud">
-            </div>
+        <div id="tagCloud" class="tag-cloud"></div>
     </div>
     
     <div id="tree-root" class="folder-children"></div>
@@ -97,19 +92,17 @@
 
     let bookmarkTree = [];
     let activeTag = null;
-    let definedTags = new Set(); // 儲存那些「手動新增但尚未被書籤使用」的標籤
     const rootEl = document.getElementById('tree-root');
     const statusEl = document.getElementById('syncStatus');
-    const tagPanel = document.getElementById('tagPanel');
 
     async function init() {
         try {
-            updateStatus("⏳ 連線中...", "info");
+            updateStatus("⏳ 連線資料庫...", "info");
             const { data, error } = await supabaseClient.from('bookmark_data').select('tree_json').eq('id', 1);
             if (error) throw error;
             if (data && data.length > 0) bookmarkTree = data[0].tree_json;
             else bookmarkTree = [{ id: "def_1", type: "folder", name: "我的書籤", children: [] }];
-            updateStatus("✅ 系統已同步", "success");
+            updateStatus("✅ 雲端已同步", "success");
             refreshUI();
         } catch (err) {
             updateStatus("❌ 失敗: " + err.message, "danger");
@@ -119,76 +112,30 @@
     }
 
     function toggleTagPanel() {
-        const isVisible = tagPanel.style.display === 'block';
-        tagPanel.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) updateTagCloud();
-    }
-
-    // 關鍵功能：單獨建立標籤
-    function createStandaloneTag() {
-        const newTagName = prompt("請輸入新標籤名稱 (例如: Production, Temp):");
-        if (newTagName && newTagName.trim() !== "") {
-            definedTags.add(newTagName.trim());
-            updateTagCloud();
-            alert(`標籤 "${newTagName}" 已建立。您現在可以在新增書籤時使用它。`);
-        }
+        const panel = document.getElementById('tagPanel');
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+        if (panel.style.display === 'block') updateTagCloud();
     }
 
     function updateTagCloud() {
         const tagsMap = {};
-        // 1. 掃描所有書籤中的標籤
-        const scan = (nodes) => {
-            nodes.forEach(n => {
-                if (n.tags) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1);
-                if (n.children) scan(n.children);
-            });
-        };
+        const scan = (nodes) => { nodes.forEach(n => { if (n.tags) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1); if (n.children) scan(n.children); }); };
         scan(bookmarkTree);
-
-        // 2. 合併手動定義的標籤 (如果書籤還沒用到，次數為 0)
-        definedTags.forEach(t => {
-            if (!(t in tagsMap)) tagsMap[t] = 0;
-        });
-
         const cloud = document.getElementById('tagCloud');
-        const keys = Object.keys(tagsMap).sort();
-        
-        if (keys.length === 0) {
-            cloud.innerHTML = '<span style="color:#94a3b8; font-size:12px;">尚無標籤，請點擊上方按鈕新增</span>';
-            return;
-        }
-
         cloud.innerHTML = '';
-        keys.forEach(tag => {
+        Object.keys(tagsMap).sort().forEach(tag => {
             const pill = document.createElement('div');
             pill.className = `tag-pill ${activeTag === tag ? 'active' : ''}`;
-            pill.innerHTML = `${tag} <span class="tag-count">${tagsMap[tag]}</span>`;
-            pill.onclick = () => {
-                activeTag = (activeTag === tag) ? null : tag;
-                refreshUI();
-            };
+            pill.innerHTML = `${tag} <span style="opacity:0.5; font-size:10px">${tagsMap[tag]}</span>`;
+            pill.onclick = () => { activeTag = (activeTag === tag) ? null : tag; refreshUI(); };
             cloud.appendChild(pill);
         });
     }
 
-    function clearFilter() {
-        activeTag = null;
-        document.getElementById('searchInput').value = '';
-        refreshUI();
-    }
-
     function refreshUI() {
-        const keyword = document.getElementById('searchInput').value;
-        const btn = document.getElementById('tagBtn');
-        if (activeTag) {
-            btn.className = 'btn-tag-toggle btn-active-filter';
-            btn.innerText = `🏷️ 過濾中: ${activeTag}`;
-        } else {
-            btn.className = 'btn-tag-toggle';
-            btn.innerText = `🏷️ 標籤管理`;
-        }
-        render(bookmarkTree, rootEl, keyword, activeTag);
-        if (tagPanel.style.display === 'block') updateTagCloud();
+        const kw = document.getElementById('searchInput').value;
+        render(bookmarkTree, rootEl, kw, activeTag);
+        if (document.getElementById('tagPanel').style.display === 'block') updateTagCloud();
     }
 
     function render(nodes, container, keyword = "", tagFilter = null) {
@@ -201,7 +148,12 @@
                 const el = document.createElement('div');
                 el.className = 'folder-node';
                 el.dataset.id = node.id; el.dataset.type = 'folder'; el.dataset.name = node.name;
-                el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><button class="btn-del" onclick="deleteNode('${node.id}')">刪除</button></div><div class="folder-children"></div>`;
+                el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span>
+                    <div class="action-btns">
+                        <button class="btn-icon" onclick="editNode('${node.id}')" title="重命名">✏️</button>
+                        <button class="btn-icon del" onclick="deleteNode('${node.id}')" title="刪除">🗑️</button>
+                    </div>
+                </div><div class="folder-children"></div>`;
                 const childWrap = el.querySelector('.folder-children');
                 render(node.children, childWrap, keyword, tagFilter);
                 if ((keyword || tagFilter) && childWrap.innerHTML === '' && !isTextMatch) return;
@@ -213,23 +165,64 @@
                 el.dataset.id = node.id; el.dataset.type = 'link'; el.dataset.name = node.name;
                 el.dataset.url = node.url; el.dataset.tags = JSON.stringify(node.tags || []);
                 const tagsHtml = (node.tags || []).map(t => `<span class="tag-item">#${t}</span>`).join('');
-                el.innerHTML = `<span>🔗</span><a href="${node.url}" target="_blank">${node.name}</a><div style="display:flex">${tagsHtml}</div><button class="btn-del" onclick="deleteNode('${node.id}')">刪除</button>`;
+                el.innerHTML = `<span>🔗</span><a href="${node.url}" target="_blank">${node.name}</a>
+                    <div style="display:flex">${tagsHtml}</div>
+                    <div class="action-btns">
+                        <button class="btn-icon" onclick="editNode('${node.id}')" title="編輯書籤">✏️</button>
+                        <button class="btn-icon del" onclick="deleteNode('${node.id}')" title="刪除">🗑️</button>
+                    </div>`;
                 container.appendChild(el);
             }
         });
         setupSortable();
     }
 
+    // --- 核心更新功能 ---
+    function editNode(id) {
+        // 在樹狀結構中找到目標
+        const findNode = (list) => {
+            for (let n of list) {
+                if (n.id === id) return n;
+                if (n.children) {
+                    const found = findNode(n.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        const node = findNode(bookmarkTree);
+        if (!node) return;
+
+        if (node.type === 'folder') {
+            const newName = prompt("修改資料夾名稱:", node.name);
+            if (newName && newName !== node.name) {
+                node.name = newName;
+                refreshUI();
+                syncToCloud();
+            }
+        } else {
+            // 編輯書籤內容
+            const newName = prompt("編輯名稱:", node.name);
+            if (newName === null) return;
+            const newUrl = prompt("編輯網址:", node.url);
+            if (newUrl === null) return;
+            const newTagsStr = prompt("編輯標籤 (用逗號隔開):", (node.tags || []).join(', '));
+            if (newTagsStr === null) return;
+
+            node.name = newName;
+            node.url = newUrl;
+            node.tags = newTagsStr.split(',').map(x => x.trim()).filter(x => x !== "");
+            
+            refreshUI();
+            syncToCloud();
+        }
+    }
+
     async function syncToCloud() {
-        updateStatus("🔄 上傳雲端中...", "info");
+        updateStatus("🔄 同步中...", "info");
         const dataToSave = buildDataFromUI(rootEl);
         const { error } = await supabaseClient.from('bookmark_data').upsert({ id: 1, tree_json: dataToSave, updated_at: new Date() });
-        if (error) updateStatus("❌ 同步失敗: " + error.message, "danger");
-        else {
-            updateStatus("✅ 雲端已同步", "success");
-            localStorage.setItem('bk_backup', JSON.stringify(dataToSave));
-            bookmarkTree = dataToSave;
-        }
+        if (!error) { updateStatus("✅ 雲端已同步", "success"); bookmarkTree = dataToSave; }
     }
 
     function buildDataFromUI(container) {
@@ -248,19 +241,12 @@
     }
 
     function addNewItem(type) {
-        const name = prompt("請輸入名稱:");
+        const name = prompt("名稱:");
         if (!name) return;
         const newItem = { id: 'idx_' + Date.now(), type: type, name: name };
         if (type === 'link') {
-            newItem.url = prompt("請輸入 URL:", "https://");
-            
-            // 提示現有標籤
-            const existingKeys = Array.from(definedTags);
-            const scanTags = (nodes) => { nodes.forEach(n => { if(n.tags) n.tags.forEach(t => existingKeys.push(t)); if(n.children) scanTags(n.children); }); };
-            scanTags(bookmarkTree);
-            const uniqueKeys = [...new Set(existingKeys)].sort().join(', ');
-
-            const t = prompt(`請輸入標籤 (用逗號隔開)\n現有標籤建議: ${uniqueKeys || '無'}`);
+            newItem.url = prompt("網址:", "https://");
+            const t = prompt("標籤 (逗號隔開):");
             newItem.tags = t ? t.split(',').map(x => x.trim()).filter(x => x !== "") : [];
         } else newItem.children = [];
         bookmarkTree.unshift(newItem);
@@ -269,22 +255,20 @@
     }
 
     function deleteNode(id) {
-        if (!confirm("確定要刪除嗎？")) return;
-        const remove = (list) => {
-            const i = list.findIndex(n => n.id === id);
-            if (i > -1) { list.splice(i, 1); return true; }
-            return list.some(n => n.children && remove(n.children));
-        };
-        remove(bookmarkTree);
-        refreshUI();
-        syncToCloud();
+        if (confirm("確定刪除？")) {
+            const remove = (list) => {
+                const i = list.findIndex(n => n.id === id);
+                if (i > -1) { list.splice(i, 1); return true; }
+                return list.some(n => n.children && remove(n.children));
+            };
+            remove(bookmarkTree);
+            refreshUI();
+            syncToCloud();
+        }
     }
 
-    function updateStatus(text, type) {
-        statusEl.innerText = text;
-        statusEl.style.background = type === "success" ? "#dcfce7" : type === "danger" ? "#fee2e2" : "#e2e8f0";
-    }
-
+    function clearFilter() { activeTag = null; refreshUI(); }
+    function updateStatus(t, s) { statusEl.innerText = t; statusEl.style.background = s === "success" ? "#dcfce7" : "#fee2e2"; }
     function manualSync() { syncToCloud(); }
 
     init();
