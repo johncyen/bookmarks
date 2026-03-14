@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v4.4 - Connectivity Checker</title>
+    <title>智聯書籤系統 v4.5 - Global Link Checker</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; --success: #10b981; --backup: #8b5cf6; }
+        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; --success: #10b981; --backup: #8b5cf6; --warning: #fbbf24; }
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
         .container { max-width: 950px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
@@ -18,6 +18,7 @@
         .btn-add { background: var(--primary); color: white; }
         .btn-sync { background: var(--success); color: white; }
         .btn-backup { background: var(--backup); color: white; }
+        .btn-check-all { background: #334155; color: white; }
         .btn-check { background: #f1f5f9; color: var(--gray); font-size: 11px; padding: 4px 8px; }
         
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; animation: fadeIn 0.3s; }
@@ -33,9 +34,10 @@
         .link-node { padding: 10px 15px; margin: 6px 0; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; background: white; cursor: move; }
         .link-node a { flex-grow: 1; text-decoration: none; color: var(--primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; background: #ccc; display: inline-block; }
-        .status-online { background: var(--success); box-shadow: 0 0 5px var(--success); }
-        .status-offline { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; background: #ccc; display: inline-block; transition: 0.3s; }
+        .status-online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .status-offline { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        .status-checking { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
         
         .tag-item { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 5px; font-weight: bold; border: 1px solid rgba(0,0,0,0.1); }
         #editModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -52,7 +54,7 @@
 <div class="container">
     <div class="header-bar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.4</span></h1>
+            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.5</span></h1>
             <div id="syncStatus" class="status-badge">載入中...</div>
         </div>
         <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤..." oninput="refreshUI()">
@@ -60,6 +62,7 @@
             <button class="btn-add" onclick="addNewItem('folder')">📁 新增資料夾</button>
             <button class="btn-add" onclick="openLinkModalForNew()">🔗 新增書籤</button>
             <button style="background:#64748b; color:white;" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
+            <button class="btn-check-all" onclick="checkAllLinks()">📡 一鍵檢測所有書籤</button>
             <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
             <button class="btn-backup" onclick="exportBackup()">💾 匯出備份</button>
         </div>
@@ -120,25 +123,36 @@
         } catch (e) { updateStatus("❌ 載入失敗", "danger"); }
     }
 
-    // --- 核心：檢查連結存活狀態 ---
+    // --- 核心：一鍵檢測所有書籤 ---
+    async function checkAllLinks() {
+        updateStatus("📡 全掃描中...", "info");
+        const links = [];
+        const scan = (nodes) => nodes.forEach(n => {
+            if (n.type === 'link') links.push(n);
+            if (n.children) scan(n.children);
+        });
+        scan(bookmarkTree);
+        
+        // 併發執行所有檢測
+        await Promise.all(links.map(link => checkLinkStatus(link.url, link.id)));
+        updateStatus("✅ 掃描完成", "success");
+        setTimeout(() => updateStatus("就緒", "info"), 3000);
+    }
+
     async function checkLinkStatus(url, elementId) {
         const dot = document.querySelector(`[data-id="${elementId}"] .status-dot`);
         if (!dot) return;
         
-        dot.style.background = "#fbbf24"; // 檢測中黃色
-        dot.className = "status-dot";
+        dot.className = "status-dot status-checking";
 
         try {
-            // 使用 no-cors 模式嘗試抓取，雖拿不到內容但可知道是否連得上
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
             await fetch(url, { mode: 'no-cors', signal: controller.signal });
-            
             clearTimeout(timeoutId);
-            dot.classList.add('status-online');
+            dot.className = "status-dot status-online";
         } catch (e) {
-            dot.classList.add('status-offline');
+            dot.className = "status-dot status-offline";
         }
     }
 
@@ -149,11 +163,8 @@
         updateStatus("🔄 同步中...", "info");
         try {
             const { error } = await supabaseClient.from('bookmark_data').upsert({
-                id: 1,
-                tree_json: JSON.parse(JSON.stringify(bookmarkTree)),
-                defined_tags: definedTags,
-                version: Number(currentVersion),
-                updated_at: new Date().toISOString()
+                id: 1, tree_json: JSON.parse(JSON.stringify(bookmarkTree)),
+                defined_tags: definedTags, version: Number(currentVersion), updated_at: new Date().toISOString()
             });
             if (error) throw error;
             updateStatus("✅ 已同步", "success");
@@ -174,9 +185,7 @@
             const originalNode = findNode(bookmarkTree, nodeId);
             if (!originalNode) return;
             const newNode = { ...originalNode };
-            if (newNode.type === 'folder') {
-                newNode.children = serializeContainer(el.querySelector('.folder-children'));
-            }
+            if (newNode.type === 'folder') newNode.children = serializeContainer(el.querySelector('.folder-children'));
             items.push(newNode);
         });
         return items;
@@ -194,10 +203,8 @@
         nodes.forEach(node => {
             const matchText = node.name.toLowerCase().includes(kw) || (node.url && node.url.toLowerCase().includes(kw));
             const matchTag = tagFilter ? (node.tags && node.tags.includes(tagFilter)) : true;
-            
             const el = document.createElement('div');
             el.dataset.id = node.id;
-            
             if (node.type === 'folder') {
                 el.className = 'folder-node';
                 el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
@@ -213,7 +220,7 @@
                     <a href="${node.url}" target="_blank">${node.name}</a>
                     ${tagsH}
                     <div style="margin-left:10px; display:flex; gap:4px;">
-                        <button class="btn-check" onclick="checkLinkStatus('${node.url}', '${node.id}')">📡 檢測</button>
+                        <button class="btn-check" onclick="checkLinkStatus('${node.url}', '${node.id}')">📡</button>
                         <button onclick="openEditModal('${node.id}')">✏️</button>
                         <button onclick="deleteNode('${node.id}')">🗑️</button>
                     </div>`;
@@ -245,29 +252,27 @@
             const delB = document.createElement('div');
             delB.className = 'tag-del-btn'; delB.innerHTML = '×';
             delB.onclick = (e) => { e.stopPropagation(); deleteDefinedTag(tag, counts[tag] || 0); };
-            pill.appendChild(nameS); pill.appendChild(delB);
-            cloud.appendChild(pill);
+            pill.appendChild(nameS); pill.appendChild(delB); cloud.appendChild(pill);
         });
     }
 
     function deleteDefinedTag(tag, count) {
-        if (confirm(`確定移除標籤「${tag}」定義？${count > 0 ? '\n尚有 '+count+' 個書籤在使用。' : ''}`)) {
+        if (confirm(`刪除標籤「${tag}」定義？${count > 0 ? '\n尚有 '+count+' 個書籤在使用。' : ''}`)) {
             definedTags = definedTags.filter(t => t !== tag);
             currentVersion++; refreshUI(); syncToCloud();
         }
     }
 
     function createStandaloneTag() {
-        const t = prompt("新標籤定義名稱:");
+        const t = prompt("新標籤名稱:");
         if (t && t.trim()) {
             if (!definedTags.includes(t.trim())) {
-                definedTags.push(t.trim());
-                currentVersion++; refreshUI(); syncToCloud();
+                definedTags.push(t.trim()); currentVersion++; refreshUI(); syncToCloud();
             }
         }
     }
 
-    // --- 視窗操作 ---
+    // --- 視窗操作與工具 ---
     function openLinkModalForNew() {
         editingId = 'link_' + Date.now();
         document.getElementById('modalTitle').innerText = "🔗 新增書籤";
@@ -307,7 +312,6 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    // --- 工具 ---
     function getTagColor(t) {
         let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
         const hue = Math.abs(h) % 360;
@@ -315,16 +319,16 @@
     }
     function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
     function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
-    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.4`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
+    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.5`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
     function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = (p.style.display === 'block') ? 'none' : 'block'; }
     function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     function manualSync() { currentVersion++; syncToCloud(); }
     function exportBackup() {
-        const d = { ver: "v4.4", date: new Date().toLocaleString(), tree: bookmarkTree, tags: definedTags };
+        const d = { ver: "v4.5", date: new Date().toLocaleString(), tree: bookmarkTree, tags: definedTags };
         const b = new Blob([JSON.stringify(d, null, 2)], {type:"application/json"});
         const a = document.createElement("a"); a.href = URL.createObjectURL(b);
-        a.download = `Bookmark_Backup_v4.4_${new Date().getTime()}.json`; a.click();
+        a.download = `Bookmark_Backup_v4.5_${new Date().getTime()}.json`; a.click();
     }
     function addNewItem(type) {
         const name = prompt("資料夾名稱:"); if(!name) return;
@@ -332,7 +336,7 @@
         currentVersion++; refreshUI(); syncToCloud();
     }
     function deleteNode(id) {
-        if(!confirm("確定刪除此項目？")) return;
+        if(!confirm("確定刪除？")) return;
         const rm = (l) => { const i = l.findIndex(n => n.id === id); if(i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
         rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
     }
