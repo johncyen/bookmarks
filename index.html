@@ -81,26 +81,30 @@
     // --- 2. 初始化：從雲端載入 ---
     async function init() {
         try {
-            statusEl.innerText = "⏳ 正在同步雲端資料...";
+            statusEl.innerText = "⏳ 正在讀取雲端資料...";
+            
+            // 使用 select 而不使用 .single() 避免 406 錯誤
             const { data, error } = await supabaseClient
                 .from('bookmark_data')
                 .select('tree_json')
-                .eq('id', 1)
-                .single();
+                .eq('id', 1);
 
-            if (error && error.code !== 'PGRST116') throw error;
+            if (error) throw error;
 
-            if (data && data.tree_json) {
-                bookmarkTree = data.tree_json;
+            if (data && data.length > 0) {
+                // 成功抓到資料
+                bookmarkTree = data[0].tree_json;
                 statusEl.innerText = "✅ 雲端同步就緒";
             } else {
+                // 資料表是空的，準備建立新資料
                 bookmarkTree = [{ id: "def_1", type: "folder", name: "我的書籤", children: [] }];
-                statusEl.innerText = "🆕 已建立初始結構";
+                statusEl.innerText = "🆕 雲端暫無資料，準備建立存檔";
             }
             render(bookmarkTree, rootEl);
         } catch (err) {
-            console.error(err);
-            statusEl.innerText = "❌ 雲端連線失敗，目前為離線模式";
+            console.error("初始化失敗:", err);
+            statusEl.innerText = "❌ 讀取失敗: " + err.message;
+            // 失敗時回退到 LocalStorage
             bookmarkTree = JSON.parse(localStorage.getItem('bk_backup')) || [{ id: "def_1", type: "folder", name: "我的書籤", children: [] }];
             render(bookmarkTree, rootEl);
         }
@@ -196,13 +200,13 @@
 
     // --- 6. 互動事件 ---
     function addNewItem(type) {
-        const name = prompt(type === 'folder' ? "資料夾名稱:" : "書籤名稱:");
+        const name = prompt(type === 'folder' ? "名稱:" : "名稱:");
         if (!name) return;
         
         const newItem = { id: 'idx_' + Date.now(), type: type, name: name };
         if (type === 'link') {
             newItem.url = prompt("網址 (https://...):", "https://");
-            const t = prompt("標籤 (用英文逗號隔開):");
+            const t = prompt("標籤 (逗號隔開):");
             newItem.tags = t ? t.split(',').map(x => x.trim()).filter(x => x !== "") : [];
         } else {
             newItem.children = [];
@@ -215,7 +219,7 @@
     }
 
     function deleteNode(id) {
-        if (confirm("確定刪除此項目？")) {
+        if (confirm("確定刪除？")) {
             const target = document.querySelector(`[data-id="${id}"]`);
             if (target) target.remove();
             syncToCloud();
@@ -224,7 +228,6 @@
 
     function handleSearch() {
         const kw = document.getElementById('searchInput').value;
-        // 搜尋時不直接修改原始 bookmarkTree，而是重新渲染畫面
         const currentData = buildDataFromUI(rootEl);
         render(currentData, rootEl, kw);
     }
