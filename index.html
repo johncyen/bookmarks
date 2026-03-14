@@ -3,120 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤 - 雲端同步版</title>
+    <title>智聯書籤系統 - Cloud Sync</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --tag-bg: #e0f2fe; --tag-text: #0369a1; }
-        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        :root {
+            --primary: #2563eb;
+            --bg: #f1f5f9;
+            --text: #1e293b;
+            --folder-bg: #f8fafc;
+            --tag-bg: #e0f2fe;
+            --tag-text: #0369a1;
+            --danger: #ef4444;
+        }
+
+        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+
+        /* Header & Search */
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
-        .controls { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
-        .search-input { flex-grow: 1; padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; }
-        .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
-        .folder-header { cursor: pointer; padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; background: #f1f5f9; }
-        .folder-children { min-height: 15px; padding: 5px 5px 10px 25px; background: white; border-top: 1px solid #f1f5f9; }
-        .link-node { padding: 10px 15px; margin: 5px 0; background: white; border: 1px solid #f1f5f9; border-radius: 6px; display: flex; align-items: center; cursor: move; }
-        .link-node a { text-decoration: none; color: var(--primary); font-weight: 500; flex-grow: 1; margin-right: 10px; }
-        .tag { background: var(--tag-bg); color: var(--tag-text); font-size: 11px; padding: 2px 8px; border-radius: 99px; margin-left: 4px; font-weight: 600; }
-        button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; }
-        .btn-main { background: var(--primary); color: white; }
-        .btn-delete { background: #fee2e2; color: #ef4444; margin-left: auto; }
-        .sync-status { font-size: 12px; color: #64748b; margin-top: 5px; }
-        .ghost { opacity: 0.3; background: #dbeafe !important; border: 2px dashed var(--primary); }
+        .status-badge { font-size: 12px; padding: 4px 8px; border-radius: 4px; background: #e2e8f0; color: #64748b; margin-bottom: 10px; display: inline-block; transition: all 0.3s; }
+        .search-box { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; margin-bottom: 15px; outline: none; box-sizing: border-box; }
+        .search-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        /* Controls */
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        button { cursor: pointer; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 500; transition: all 0.2s; }
+        .btn-add { background: var(--primary); color: white; }
+        .btn-sync { background: #10b981; color: white; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Structure */
+        .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); overflow: hidden; }
+        .folder-header { cursor: pointer; padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; user-select: none; }
+        .folder-children { min-height: 30px; padding: 5px 5px 15px 25px; background: white; border-top: 1px solid #f1f5f9; }
+
+        .link-node { padding: 12px 15px; margin: 6px 0; background: white; border: 1px solid #f1f5f9; border-radius: 6px; display: flex; align-items: center; cursor: move; }
+        .link-node:hover { border-color: var(--primary); background: #f0f7ff; }
+        .link-node a { text-decoration: none; color: var(--primary); flex-grow: 1; font-weight: 500; }
+
+        /* Tags */
+        .tag-list { display: flex; gap: 4px; margin: 0 10px; }
+        .tag { background: var(--tag-bg); color: var(--tag-text); font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: bold; white-space: nowrap; }
+
+        .btn-del { color: var(--danger); background: none; padding: 4px; font-size: 12px; }
+        .ghost { opacity: 0.2; background: #dbeafe !important; border: 2px dashed var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header-bar">
-        <h1>🔖 智聯書籤 (Cloud)</h1>
-        <div id="status" class="sync-status">正在連線至雲端...</div>
-        <input type="text" id="globalSearch" class="search-input" placeholder="搜尋名稱、網址或 #標籤..." oninput="onSearch()">
+        <h1>智聯書籤系統</h1>
+        <div id="syncStatus" class="status-badge">初始化中...</div>
+        <input type="text" id="searchInput" class="search-box" placeholder="搜尋名稱、網址或 #標籤..." oninput="handleSearch()">
         <div class="controls">
-            <button class="btn-main" onclick="addItem('folder')">+ 資料夾</button>
-            <button class="btn-main" onclick="addItem('link')">+ 書籤</button>
-            <button style="background: #10b981; color: white;" onclick="saveToCloud()">☁️ 手動同步</button>
+            <button class="btn-add" onclick="addNewItem('folder')">+ 資料夾</button>
+            <button class="btn-add" onclick="addNewItem('link')">+ 書籤</button>
+            <button class="btn-sync" onclick="manualSync()">☁️ 立即同步</button>
         </div>
     </div>
-    <div id="root-container" class="folder-children" data-id="root"></div>
+    
+    <div id="tree-root" class="folder-children">
+        </div>
 </div>
 
 <script>
-    // --- 1. 配置 Supabase ---
-    const SUPABASE_URL = 'https://qnceyxqpkqvjucalufma.supabase.com';
-    const SUPABASE_KEY = 'sb_publishable_3CSAHSwlwROSPgZJ0kdDTA_xP6iXDf-';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // --- 1. Supabase 配置 ---
+    const SB_URL = 'https://qnceyxqpkqvjucalufma.supabase.com';
+    const SB_KEY = 'sb_publishable_3CSAHSwlwROSPgZJ0kdDTA_xP6iXDf-';
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     let bookmarkTree = [];
-    const rootElement = document.getElementById('root-container');
-    const statusEl = document.getElementById('status');
+    const rootEl = document.getElementById('tree-root');
+    const statusEl = document.getElementById('syncStatus');
 
-    // --- 2. 核心邏輯：雲端讀取 ---
-    async function initSystem() {
+    // --- 2. 初始化：從雲端載入 ---
+    async function init() {
         try {
-            statusEl.innerText = "正在從雲端載入資料...";
+            statusEl.innerText = "⏳ 正在同步雲端資料...";
             const { data, error } = await supabaseClient
                 .from('bookmark_data')
                 .select('tree_json')
-                .eq('id', 1) // 我們固定讀取 ID 為 1 的這筆設定
+                .eq('id', 1)
                 .single();
 
-            if (error && error.code !== 'PGRST116') throw error; // PGRST116 是找不到資料，正常
+            if (error && error.code !== 'PGRST116') throw error;
 
-            if (data) {
+            if (data && data.tree_json) {
                 bookmarkTree = data.tree_json;
-                statusEl.innerText = "☁️ 雲端同步已就緒";
+                statusEl.innerText = "✅ 雲端同步就緒";
             } else {
-                bookmarkTree = [{ id: "root_1", type: "folder", name: "我的書籤", children: [] }];
-                statusEl.innerText = "🆕 已建立新書籤檔";
+                bookmarkTree = [{ id: "def_1", type: "folder", name: "我的書籤", children: [] }];
+                statusEl.innerText = "🆕 已建立初始結構";
             }
-            render(bookmarkTree, rootElement);
+            render(bookmarkTree, rootEl);
         } catch (err) {
             console.error(err);
-            statusEl.innerText = "❌ 連線失敗，目前為離線模式";
-            // 失敗時回退到 LocalStorage
-            bookmarkTree = JSON.parse(localStorage.getItem('my_bookmarks_pro')) || [];
-            render(bookmarkTree, rootElement);
+            statusEl.innerText = "❌ 雲端連線失敗，目前為離線模式";
+            bookmarkTree = JSON.parse(localStorage.getItem('bk_backup')) || [{ id: "def_1", type: "folder", name: "我的書籤", children: [] }];
+            render(bookmarkTree, rootEl);
         }
     }
 
-    // --- 3. 核心邏輯：雲端儲存 ---
-    async function saveToCloud() {
-        const tree = buildTreeFromDOM(rootElement);
-        statusEl.innerText = "⏳ 同步中...";
+    // --- 3. 同步：儲存至雲端 ---
+    async function syncToCloud() {
+        const currentData = buildDataFromUI(rootEl);
+        statusEl.innerText = "🔄 同步中...";
         
         const { error } = await supabaseClient
             .from('bookmark_data')
-            .upsert({ id: 1, tree_json: tree, updated_at: new Date() });
+            .upsert({ id: 1, tree_json: currentData, updated_at: new Date() });
 
         if (error) {
-            statusEl.innerText = "❌ 同步失敗: " + error.message;
+            statusEl.innerText = "❌ 同步錯誤: " + error.message;
+            console.error(error);
         } else {
-            statusEl.innerText = "✅ 已同步至雲端 (" + new Date().toLocaleTimeString() + ")";
-            localStorage.setItem('my_bookmarks_pro', JSON.stringify(tree));
+            statusEl.innerText = "✅ 已同步至雲端 " + new Date().toLocaleTimeString();
+            localStorage.setItem('bk_backup', JSON.stringify(currentData));
         }
     }
 
-    // --- 4. UI 渲染功能 (保持不變) ---
+    // --- 4. 渲染邏輯 ---
     function render(nodes, container, keyword = "") {
         container.innerHTML = '';
         nodes.forEach(node => {
-            const lowKey = keyword.toLowerCase();
-            const isMatch = node.name.toLowerCase().includes(lowKey) || 
-                            (node.url && node.url.toLowerCase().includes(lowKey)) ||
-                            (node.tags && node.tags.some(t => t.toLowerCase().includes(lowKey)));
+            const kw = keyword.toLowerCase();
+            const isMatch = node.name.toLowerCase().includes(kw) || 
+                            (node.url && node.url.toLowerCase().includes(kw)) ||
+                            (node.tags && node.tags.some(t => t.toLowerCase().includes(kw)));
 
             if (node.type === 'folder') {
                 const el = document.createElement('div');
                 el.className = 'folder-node';
-                el.dataset.id = node.id;
-                el.dataset.type = 'folder';
-                el.dataset.name = node.name;
-                el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><button class="btn-delete" onclick="deleteItem('${node.id}')">刪</button></div><div class="folder-children"></div>`;
-                const childContainer = el.querySelector('.folder-children');
-                render(node.children, childContainer, keyword);
-                if (keyword && !isMatch && childContainer.innerHTML === '') return;
+                el.dataset.id = node.id; el.dataset.type = 'folder'; el.dataset.name = node.name;
+                el.innerHTML = `
+                    <div class="folder-header">
+                        <span>📂 ${node.name}</span>
+                        <button class="btn-del" onclick="deleteNode('${node.id}')">刪除</button>
+                    </div>
+                    <div class="folder-children"></div>
+                `;
+                const childWrap = el.querySelector('.folder-children');
+                render(node.children, childWrap, keyword);
+                
+                if (keyword && !isMatch && childWrap.innerHTML === '') return;
                 container.appendChild(el);
             } else {
                 if (keyword && !isMatch) return;
@@ -124,66 +155,87 @@
                 el.className = 'link-node';
                 el.dataset.id = node.id; el.dataset.type = 'link'; el.dataset.name = node.name;
                 el.dataset.url = node.url; el.dataset.tags = JSON.stringify(node.tags || []);
+                
                 const tagsHtml = (node.tags || []).map(t => `<span class="tag">#${t}</span>`).join('');
-                el.innerHTML = `<span>🔗</span><a href="${node.url}" target="_blank">${node.name}</a><div style="display:flex;">${tagsHtml}</div><button class="btn-delete" onclick="deleteItem('${node.id}')">刪</button>`;
+                el.innerHTML = `
+                    <span>🔗</span>
+                    <a href="${node.url}" target="_blank">${node.name}</a>
+                    <div class="tag-list">${tagsHtml}</div>
+                    <button class="btn-del" onclick="deleteNode('${node.id}')">刪除</button>
+                `;
                 container.appendChild(el);
             }
         });
-        initSortable();
+        setupSortable();
     }
 
-    function initSortable() {
+    // --- 5. 拖曳與資料處理 ---
+    function setupSortable() {
         document.querySelectorAll('.folder-children').forEach(el => {
-            new Sortable(el, { group: 'nested', animation: 150, ghostClass: 'ghost', onEnd: saveToCloud });
+            new Sortable(el, {
+                group: 'nested',
+                animation: 150,
+                ghostClass: 'ghost',
+                onEnd: () => syncToCloud()
+            });
         });
     }
 
-    function buildTreeFromDOM(container) {
+    function buildDataFromUI(container) {
         return Array.from(container.children).map(el => {
-            const item = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
-            if (item.type === 'folder') {
-                item.children = buildTreeFromDOM(el.querySelector('.folder-children'));
+            const node = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
+            if (node.type === 'folder') {
+                node.children = buildDataFromUI(el.querySelector('.folder-children'));
             } else {
-                item.url = el.dataset.url;
-                item.tags = JSON.parse(el.dataset.tags || "[]");
+                node.url = el.dataset.url;
+                node.tags = JSON.parse(el.dataset.tags || "[]");
             }
-            return item;
+            return node;
         });
     }
 
-    // --- 5. 操作功能 ---
-    function addItem(type) {
-        const name = prompt(type === 'folder' ? "名稱:" : "名稱:");
+    // --- 6. 互動事件 ---
+    function addNewItem(type) {
+        const name = prompt(type === 'folder' ? "資料夾名稱:" : "書籤名稱:");
         if (!name) return;
-        const newItem = { id: 'id_' + Date.now(), type: type, name: name };
-        if (type === 'link') {
-            newItem.url = prompt("網址:", "https://");
-            const t = prompt("標籤 (逗號隔開):");
-            newItem.tags = t ? t.split(',').map(x => x.trim()) : [];
-        } else { newItem.children = []; }
         
-        // 取得當前資料結構並更新
-        const currentTree = buildTreeFromDOM(rootElement);
-        currentTree.unshift(newItem);
-        render(currentTree, rootElement);
-        saveToCloud();
+        const newItem = { id: 'idx_' + Date.now(), type: type, name: name };
+        if (type === 'link') {
+            newItem.url = prompt("網址 (https://...):", "https://");
+            const t = prompt("標籤 (用英文逗號隔開):");
+            newItem.tags = t ? t.split(',').map(x => x.trim()).filter(x => x !== "") : [];
+        } else {
+            newItem.children = [];
+        }
+
+        const data = buildDataFromUI(rootEl);
+        data.unshift(newItem);
+        render(data, rootEl);
+        syncToCloud();
     }
 
-    function deleteItem(id) {
-        if (!confirm("確定刪除？")) return;
-        const el = document.querySelector(`[data-id="${id}"]`);
-        if (el) el.remove();
-        saveToCloud();
+    function deleteNode(id) {
+        if (confirm("確定刪除此項目？")) {
+            const target = document.querySelector(`[data-id="${id}"]`);
+            if (target) target.remove();
+            syncToCloud();
+        }
     }
 
-    function onSearch() {
-        const kw = document.getElementById('globalSearch').value;
-        const currentTree = buildTreeFromDOM(rootElement);
-        render(currentTree, rootElement, kw);
+    function handleSearch() {
+        const kw = document.getElementById('searchInput').value;
+        // 搜尋時不直接修改原始 bookmarkTree，而是重新渲染畫面
+        const currentData = buildDataFromUI(rootEl);
+        render(currentData, rootEl, kw);
     }
 
-    // 啟動系統
-    initSystem();
+    function manualSync() {
+        syncToCloud();
+    }
+
+    // 啟動程式
+    init();
 </script>
+
 </body>
 </html>
