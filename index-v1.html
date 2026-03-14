@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業級書籤管理系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f1f5f9;
+            --text: #1e293b;
+            --folder-bg: #f8fafc;
+            --tag-bg: #e0f2fe;
+            --tag-text: #0369a1;
+        }
+
+        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; }
+        
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+        /* Header & Search */
+        .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+        .controls { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .search-input { flex-grow: 1; padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; transition: border 0.2s; }
+        .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        /* Nodes & Folders */
+        .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); }
+        .folder-header { cursor: pointer; padding: 12px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; }
+        .folder-children { min-height: 15px; padding: 5px 5px 10px 25px; background: white; border-top: 1px solid #f1f5f9; }
+
+        .link-node { padding: 10px 15px; margin: 5px 0; background: white; border: 1px solid #f1f5f9; border-radius: 6px; display: flex; align-items: center; cursor: move; transition: all 0.2s; }
+        .link-node:hover { border-color: var(--primary); transform: translateX(5px); }
+        .link-node a { text-decoration: none; color: var(--primary); font-weight: 500; flex-grow: 1; margin-right: 10px; }
+
+        /* Tags */
+        .tag { background: var(--tag-bg); color: var(--tag-text); font-size: 11px; padding: 2px 8px; border-radius: 99px; margin-left: 4px; font-weight: 600; white-space: nowrap; }
+
+        /* Buttons */
+        button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; transition: opacity 0.2s; }
+        .btn-main { background: var(--primary); color: white; }
+        .btn-delete { background: #fee2e2; color: #ef4444; margin-left: auto; }
+        button:hover { opacity: 0.8; }
+
+        /* Drag Style */
+        .ghost { opacity: 0.3; background: #dbeafe !important; border: 2px dashed var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-bar">
+        <h1>🔖 智能書籤系統</h1>
+        <input type="text" id="globalSearch" class="search-input" placeholder="搜尋名稱、網址或 #標籤..." oninput="onSearch()">
+        <div class="controls">
+            <button class="btn-main" onclick="addItem('folder')">+ 新增資料夾</button>
+            <button class="btn-main" onclick="addItem('link')">+ 新增書籤</button>
+            <button style="background: #64748b; color: white;" onclick="exportData()">💾 匯出備份</button>
+        </div>
+    </div>
+    
+    <div id="root-container" class="folder-children" data-id="root">
+        </div>
+</div>
+
+<script>
+    // 1. 初始化資料載入
+    let bookmarkTree = JSON.parse(localStorage.getItem('my_bookmarks_pro')) || [
+        { id: "init_1", type: "folder", name: "快速入門", children: [
+            { id: "init_2", type: "link", name: "GitHub", url: "https://github.com", tags: ["開發", "工具"] }
+        ]}
+    ];
+
+    const rootElement = document.getElementById('root-container');
+
+    // 2. 渲染函數
+    function render(nodes, container, keyword = "") {
+        container.innerHTML = '';
+        
+        nodes.forEach(node => {
+            const lowKey = keyword.toLowerCase();
+            const isMatch = node.name.toLowerCase().includes(lowKey) || 
+                            (node.url && node.url.toLowerCase().includes(lowKey)) ||
+                            (node.tags && node.tags.some(t => t.toLowerCase().includes(lowKey)));
+
+            if (node.type === 'folder') {
+                const el = document.createElement('div');
+                el.className = 'folder-node';
+                el.dataset.id = node.id;
+                el.dataset.type = 'folder';
+                el.dataset.name = node.name;
+                el.innerHTML = `
+                    <div class="folder-header">
+                        <span>📂 ${node.name}</span>
+                        <button class="btn-delete" onclick="deleteItem('${node.id}')">刪除</button>
+                    </div>
+                    <div class="folder-children"></div>
+                `;
+                const childContainer = el.querySelector('.folder-children');
+                render(node.children, childContainer, keyword);
+                
+                // 如果搜尋時，資料夾本身跟內容都不符，則隱藏
+                if (keyword && !isMatch && childContainer.innerHTML === '') return;
+                container.appendChild(el);
+            } else {
+                if (keyword && !isMatch) return;
+                const el = document.createElement('div');
+                el.className = 'link-node';
+                el.dataset.id = node.id;
+                el.dataset.type = 'link';
+                el.dataset.name = node.name;
+                el.dataset.url = node.url;
+                el.dataset.tags = JSON.stringify(node.tags || []);
+                
+                const tagsHtml = (node.tags || []).map(t => `<span class="tag">#${t}</span>`).join('');
+                el.innerHTML = `
+                    <span>🔗</span>
+                    <a href="${node.url}" target="_blank">${node.name}</a>
+                    <div style="display:flex;">${tagsHtml}</div>
+                    <button class="btn-delete" onclick="deleteItem('${node.id}')">刪</button>
+                `;
+                container.appendChild(el);
+            }
+        });
+        initSortable();
+    }
+
+    // 3. 拖曳功能初始化
+    function initSortable() {
+        document.querySelectorAll('.folder-children').forEach(el => {
+            new Sortable(el, {
+                group: 'nested',
+                animation: 150,
+                ghostClass: 'ghost',
+                onEnd: () => { saveAllData(); }
+            });
+        });
+    }
+
+    // 4. 資料持久化 (DOM 轉 JSON 並儲存)
+    function saveAllData() {
+        const tree = buildTreeFromDOM(rootElement);
+        localStorage.setItem('my_bookmarks_pro', JSON.stringify(tree));
+    }
+
+    function buildTreeFromDOM(container) {
+        return Array.from(container.children).map(el => {
+            const item = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
+            if (item.type === 'folder') {
+                item.children = buildTreeFromDOM(el.querySelector('.folder-children'));
+            } else {
+                item.url = el.dataset.url;
+                item.tags = JSON.parse(el.dataset.tags || "[]");
+            }
+            return item;
+        });
+    }
+
+    // 5. 互動功能
+    function addItem(type) {
+        const name = prompt(type === 'folder' ? "資料夾名稱:" : "書籤名稱:");
+        if (!name) return;
+        
+        const newItem = { id: 'id_' + Date.now(), type: type, name: name };
+        if (type === 'link') {
+            newItem.url = prompt("網址 (含 https://):", "https://");
+            const t = prompt("標籤 (用逗號隔開):");
+            newItem.tags = t ? t.split(',').map(x => x.trim()) : [];
+        } else {
+            newItem.children = [];
+        }
+
+        bookmarkTree.unshift(newItem);
+        render(bookmarkTree, rootElement);
+        saveAllData();
+    }
+
+    function deleteItem(id) {
+        if (!confirm("確定要刪除嗎？")) return;
+        document.querySelector(`[data-id="${id}"]`).remove();
+        saveAllData();
+    }
+
+    function onSearch() {
+        const kw = document.getElementById('globalSearch').value;
+        render(bookmarkTree, rootElement, kw);
+    }
+
+    function exportData() {
+        const dataStr = localStorage.getItem('my_bookmarks_pro');
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bookmarks_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    }
+
+    // 啟動
+    render(bookmarkTree, rootElement);
+</script>
+
+</body>
+</html>
