@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v4.5 - Global Link Checker</title>
+    <title>智聯書籤系統 v4.7 - Security & Global Checker</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="config.js"></script>
+    
     <style>
         :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; --success: #10b981; --backup: #8b5cf6; --warning: #fbbf24; }
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
@@ -54,23 +56,23 @@
 <div class="container">
     <div class="header-bar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.5</span></h1>
+            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.7</span></h1>
             <div id="syncStatus" class="status-badge">載入中...</div>
         </div>
-        <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤..." oninput="refreshUI()">
+        <input type="text" id="searchInput" class="search-box" placeholder="搜尋書籤或標籤..." oninput="refreshUI()">
         <div class="controls">
-            <button class="btn-add" onclick="addNewItem('folder')">📁 新增資料夾</button>
-            <button class="btn-add" onclick="openLinkModalForNew()">🔗 新增書籤</button>
+            <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
+            <button class="btn-add" onclick="openLinkModalForNew()">🔗 書籤</button>
             <button style="background:#64748b; color:white;" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
-            <button class="btn-check-all" onclick="checkAllLinks()">📡 一鍵檢測所有書籤</button>
+            <button class="btn-check-all" onclick="checkAllLinks()">📡 全域檢測</button>
             <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
-            <button class="btn-backup" onclick="exportBackup()">💾 匯出備份</button>
+            <button class="btn-backup" onclick="exportBackup()">💾 備份</button>
         </div>
     </div>
 
     <div id="tagPanel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤定義</button></div>
+            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
             <span style="cursor:pointer; color:var(--primary); font-size:12px;" onclick="clearFilter()">清除過濾 ×</span>
         </div>
         <div id="tagCloud" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
@@ -86,7 +88,7 @@
         <label>名稱</label><input type="text" id="editName">
         <div id="linkFields">
             <label>網址</label><input type="text" id="editUrl">
-            <label>標籤 (點選下方快速加入)</label>
+            <label>標籤 (點選快速加入)</label>
             <input type="text" id="editTags">
             <div id="tagPicker" class="tag-picker-container"></div>
         </div>
@@ -98,8 +100,9 @@
 </div>
 
 <script>
-    const SB_URL = 'https://qnceyxqpkqvjucalufma.supabase.co';
-    const SB_KEY = 'sb_publishable_3CSAHSwlwROSPgZJ0kdDTA_xP6iXDf-';
+    // 從 CONFIG 物件讀取配置
+    const SB_URL = CONFIG.SB_URL;
+    const SB_KEY = CONFIG.SB_KEY;
     const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
     let bookmarkTree = [];
@@ -120,20 +123,18 @@
             }
             refreshUI();
             updateStatus("就緒", "info");
-        } catch (e) { updateStatus("❌ 載入失敗", "danger"); }
+        } catch (e) { updateStatus("❌ 初始化失敗", "danger"); console.error(e); }
     }
 
-    // --- 核心：一鍵檢測所有書籤 ---
+    // --- 連結檢測邏輯 ---
     async function checkAllLinks() {
-        updateStatus("📡 全掃描中...", "info");
+        updateStatus("📡 掃描中...", "info");
         const links = [];
         const scan = (nodes) => nodes.forEach(n => {
             if (n.type === 'link') links.push(n);
             if (n.children) scan(n.children);
         });
         scan(bookmarkTree);
-        
-        // 併發執行所有檢測
         await Promise.all(links.map(link => checkLinkStatus(link.url, link.id)));
         updateStatus("✅ 掃描完成", "success");
         setTimeout(() => updateStatus("就緒", "info"), 3000);
@@ -142,9 +143,7 @@
     async function checkLinkStatus(url, elementId) {
         const dot = document.querySelector(`[data-id="${elementId}"] .status-dot`);
         if (!dot) return;
-        
         dot.className = "status-dot status-checking";
-
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -156,20 +155,28 @@
         }
     }
 
-    // --- 同步與結構保存 ---
+    // --- 同步與持久化 ---
     async function syncToCloud() {
         if (isSyncing) return;
         isSyncing = true;
         updateStatus("🔄 同步中...", "info");
         try {
             const { error } = await supabaseClient.from('bookmark_data').upsert({
-                id: 1, tree_json: JSON.parse(JSON.stringify(bookmarkTree)),
-                defined_tags: definedTags, version: Number(currentVersion), updated_at: new Date().toISOString()
+                id: 1, 
+                tree_json: JSON.parse(JSON.stringify(bookmarkTree)),
+                defined_tags: definedTags, 
+                version: Number(currentVersion), 
+                updated_at: new Date().toISOString()
             });
             if (error) throw error;
             updateStatus("✅ 已同步", "success");
-        } catch (err) { updateStatus(`❌ 錯誤: ${err.message}`, "danger"); }
-        finally { isSyncing = false; updateVersionDisplay(); }
+        } catch (err) { 
+            updateStatus(`❌ 同步錯誤`, "danger"); 
+            console.error(err);
+        } finally { 
+            isSyncing = false; 
+            updateVersionDisplay(); 
+        }
     }
 
     function saveTreeFromUI() {
@@ -191,6 +198,7 @@
         return items;
     }
 
+    // --- UI 渲染 ---
     function refreshUI() {
         render(bookmarkTree, document.getElementById('tree-root'), document.getElementById('searchInput').value, activeTag);
         updateTagCloud();
@@ -205,6 +213,7 @@
             const matchTag = tagFilter ? (node.tags && node.tags.includes(tagFilter)) : true;
             const el = document.createElement('div');
             el.dataset.id = node.id;
+            
             if (node.type === 'folder') {
                 el.className = 'folder-node';
                 el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
@@ -257,7 +266,7 @@
     }
 
     function deleteDefinedTag(tag, count) {
-        if (confirm(`刪除標籤「${tag}」定義？${count > 0 ? '\n尚有 '+count+' 個書籤在使用。' : ''}`)) {
+        if (confirm(`刪除標籤「${tag}」？`)) {
             definedTags = definedTags.filter(t => t !== tag);
             currentVersion++; refreshUI(); syncToCloud();
         }
@@ -272,7 +281,33 @@
         }
     }
 
-    // --- 視窗操作與工具 ---
+    // --- 輔助工具 ---
+    function getTagColor(t) {
+        let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
+        const hue = Math.abs(h) % 360;
+        return { bg: `hsl(${hue}, 80%, 95%)`, text: `hsl(${hue}, 80%, 25%)`, border: `hsl(${hue}, 80%, 85%)` };
+    }
+    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
+    function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
+    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.7`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
+    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = (p.style.display === 'block') ? 'none' : 'block'; }
+    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+    function manualSync() { currentVersion++; syncToCloud(); }
+    
+    function exportBackup() {
+        const d = { ver: "v4.7", date: new Date().toLocaleString(), tree: bookmarkTree, tags: definedTags };
+        const b = new Blob([JSON.stringify(d, null, 2)], {type:"application/json"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(b);
+        a.download = `Bookmark_Backup_v4.7_${new Date().getTime()}.json`; a.click();
+    }
+
+    function addNewItem(type) {
+        const name = prompt("名稱:"); if(!name) return;
+        bookmarkTree.unshift({ id: 'f_'+Date.now(), type, name, children: [] });
+        currentVersion++; refreshUI(); syncToCloud();
+    }
+
     function openLinkModalForNew() {
         editingId = 'link_' + Date.now();
         document.getElementById('modalTitle').innerText = "🔗 新增書籤";
@@ -312,34 +347,12 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    function getTagColor(t) {
-        let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
-        const hue = Math.abs(h) % 360;
-        return { bg: `hsl(${hue}, 80%, 95%)`, text: `hsl(${hue}, 80%, 25%)`, border: `hsl(${hue}, 80%, 85%)` };
-    }
-    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
-    function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
-    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.5`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
-    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = (p.style.display === 'block') ? 'none' : 'block'; }
-    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function manualSync() { currentVersion++; syncToCloud(); }
-    function exportBackup() {
-        const d = { ver: "v4.5", date: new Date().toLocaleString(), tree: bookmarkTree, tags: definedTags };
-        const b = new Blob([JSON.stringify(d, null, 2)], {type:"application/json"});
-        const a = document.createElement("a"); a.href = URL.createObjectURL(b);
-        a.download = `Bookmark_Backup_v4.5_${new Date().getTime()}.json`; a.click();
-    }
-    function addNewItem(type) {
-        const name = prompt("資料夾名稱:"); if(!name) return;
-        bookmarkTree.unshift({ id: 'f_'+Date.now(), type, name, children: [] });
-        currentVersion++; refreshUI(); syncToCloud();
-    }
     function deleteNode(id) {
         if(!confirm("確定刪除？")) return;
         const rm = (l) => { const i = l.findIndex(n => n.id === id); if(i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
         rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
     }
+
     function renderTagPicker() {
         const picker = document.getElementById('tagPicker'); const input = document.getElementById('editTags');
         const current = input.value.split(',').map(t => t.trim()).filter(t => t);
