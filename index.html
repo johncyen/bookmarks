@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v4.0 - Stable</title>
+    <title>智聯書籤系統 v4.1 - Tag Manager+</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; }
+        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; }
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
@@ -18,8 +18,10 @@
         .btn-add { background: var(--primary); color: white; }
         .btn-sync { background: #10b981; color: white; }
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; animation: fadeIn 0.3s; }
-        .tag-pill { border: 1px solid transparent; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; transition: 0.3s; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tag-pill { display: flex; align-items: center; border: 1px solid transparent; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; transition: 0.3s; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .tag-pill.active { border-color: #333 !important; transform: scale(1.05); font-weight: bold; }
+        .tag-del-btn { margin-left: 8px; color: var(--gray); font-size: 16px; font-weight: bold; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .tag-del-btn:hover { background: var(--danger); color: white; }
         .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); overflow: hidden; }
         .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; }
         .folder-children { min-height: 20px; padding: 5px 5px 10px 20px; background: white; }
@@ -40,10 +42,10 @@
 <div class="container">
     <div class="header-bar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.0</span></h1>
+            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.1</span></h1>
             <div id="syncStatus" class="status-badge">載入中...</div>
         </div>
-        <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤..." oninput="refreshUI()">
+        <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤過濾..." oninput="refreshUI()">
         <div class="controls">
             <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
             <button class="btn-add" onclick="openLinkModalForNew()">🔗 書籤</button>
@@ -54,7 +56,7 @@
 
     <div id="tagPanel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
+            <div><strong>標籤池 (點選名稱過濾，點選 × 刪除定義)</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
             <span style="cursor:pointer; color:var(--primary); font-size:12px;" onclick="clearFilter()">清除過濾 ×</span>
         </div>
         <div id="tagCloud" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
@@ -66,11 +68,11 @@
 
 <div id="editModal">
     <div class="modal-content">
-        <h3 id="modalTitle" style="margin-top:0">編輯書籤</h3>
+        <h3 id="modalTitle" style="margin-top:0">編輯</h3>
         <label>名稱</label><input type="text" id="editName">
         <div id="linkFields">
             <label>網址</label><input type="text" id="editUrl">
-            <label>標籤 (點選下方加入)</label>
+            <label>標籤 (點選下方快速加入)</label>
             <input type="text" id="editTags">
             <div id="tagPicker" class="tag-picker-container"></div>
         </div>
@@ -104,36 +106,27 @@
             }
             refreshUI();
             updateStatus("就緒", "info");
-        } catch (e) { updateStatus("❌ 載入失敗", "danger"); }
+        } catch (e) { updateStatus("❌ 初始化失敗", "danger"); }
     }
 
-    // --- 同步核心 v4.0 (強化資料清洗) ---
     async function syncToCloud() {
         if (isSyncing) return;
         isSyncing = true;
         updateStatus("🔄 同步中...", "info");
-
-        // 強制轉換資料型態，避免 Supabase 報錯
         const payload = {
             id: 1,
-            tree_json: JSON.parse(JSON.stringify(bookmarkTree)), // 深拷貝確保純 JSON
-            defined_tags: Array.from(new Set(definedTags.filter(t => typeof t === 'string' && t.trim() !== ""))),
+            tree_json: JSON.parse(JSON.stringify(bookmarkTree)),
+            defined_tags: Array.from(new Set(definedTags.filter(t => t))),
             version: Number(currentVersion),
             updated_at: new Date().toISOString()
         };
-
         try {
             const { error } = await supabaseClient.from('bookmark_data').upsert(payload);
             if (error) throw error;
             updateStatus("✅ 已同步", "success");
             setTimeout(() => { if(!isSyncing) updateStatus("就緒", "info"); }, 2000);
-        } catch (err) {
-            console.error("Sync Error:", err);
-            updateStatus(`❌ 同步錯誤: ${err.message}`, "danger");
-        } finally {
-            isSyncing = false;
-            updateVersionDisplay();
-        }
+        } catch (err) { updateStatus(`❌ 錯誤: ${err.message}`, "danger"); }
+        finally { isSyncing = false; updateVersionDisplay(); }
     }
 
     function refreshUI() {
@@ -157,13 +150,47 @@
             const pill = document.createElement('div');
             pill.className = `tag-pill ${activeTag === tag ? 'active' : ''}`;
             Object.assign(pill.style, { backgroundColor: c.bg, color: c.text, borderColor: c.border, borderStyle: 'solid', borderWidth: '1px' });
-            pill.innerHTML = `${tag} <span style="font-size:10px; opacity:0.5">(${counts[tag] || 0})</span>`;
-            pill.onclick = () => { activeTag = (activeTag === tag) ? null : tag; refreshUI(); };
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.innerHTML = `${tag} <span style="font-size:10px; opacity:0.5">(${counts[tag] || 0})</span>`;
+            nameSpan.onclick = () => { activeTag = (activeTag === tag) ? null : tag; refreshUI(); };
+            
+            const delBtn = document.createElement('div');
+            delBtn.className = 'tag-del-btn';
+            delBtn.innerHTML = '×';
+            delBtn.onclick = (e) => { e.stopPropagation(); deleteDefinedTag(tag, counts[tag] || 0); };
+            
+            pill.appendChild(nameSpan);
+            pill.appendChild(delBtn);
             cloud.appendChild(pill);
         });
     }
 
-    // --- 整合視窗新增書籤 ---
+    // --- 新功能：刪除標籤定義 ---
+    function deleteDefinedTag(tag, count) {
+        let msg = `確定要從標籤池移除「${tag}」嗎？`;
+        if (count > 0) msg = `警告：目前有 ${count} 個書籤正在使用「${tag}」。\n移除定義後，這些書籤仍會保留標籤，但標籤池將不再顯示此標籤。\n是否繼續？`;
+        
+        if (confirm(msg)) {
+            definedTags = definedTags.filter(t => t !== tag);
+            currentVersion++;
+            refreshUI();
+            syncToCloud();
+        }
+    }
+
+    function createStandaloneTag() {
+        const t = prompt("輸入新標籤名稱:");
+        if (t && t.trim()) {
+            if (!definedTags.includes(t.trim())) {
+                definedTags.push(t.trim());
+                currentVersion++;
+                refreshUI();
+                syncToCloud();
+            }
+        }
+    }
+
     function openLinkModalForNew() {
         editingId = 'new_' + Date.now();
         document.getElementById('modalTitle').innerText = "🔗 新增書籤";
@@ -175,12 +202,11 @@
         document.getElementById('saveBtn').onclick = () => {
             const name = document.getElementById('editName').value;
             const url = document.getElementById('editUrl').value;
-            if (!name || !url) { alert("請填寫名稱與網址"); return; }
+            if (!name) return;
             const tags = document.getElementById('editTags').value.split(',').map(x => x.trim()).filter(x => x);
             bookmarkTree.unshift({ id: editingId, type: 'link', name, url, tags });
             tags.forEach(t => { if(!definedTags.includes(t)) definedTags.push(t); });
-            currentVersion++;
-            closeEditModal(); refreshUI(); syncToCloud();
+            currentVersion++; closeEditModal(); refreshUI(); syncToCloud();
         };
         document.getElementById('editModal').style.display = 'flex';
     }
@@ -194,28 +220,9 @@
             return l.some(n => n.children && rm(n.children));
         };
         rm(bookmarkTree);
-        if (node.type === 'link' && node.tags) {
-            const scan = (l, set) => l.forEach(n => { if(n.tags) n.tags.forEach(t => set.add(t)); if(n.children) scan(n.children, set); });
-            const used = new Set(); scan(bookmarkTree, used);
-            const orphans = node.tags.filter(t => !used.has(t) && definedTags.includes(t));
-            if (orphans.length > 0 && confirm(`標籤 [ ${orphans.join(', ')} ] 已無使用，要刪除定義嗎？`)) {
-                definedTags = definedTags.filter(t => !orphans.includes(t));
-            }
-        }
         currentVersion++; refreshUI(); syncToCloud();
     }
 
-    function createStandaloneTag() {
-        const t = prompt("新標籤名稱:");
-        if (t && t.trim()) {
-            if (!definedTags.includes(t.trim())) {
-                definedTags.push(t.trim());
-                currentVersion++; syncToCloud(); refreshUI();
-            }
-        }
-    }
-
-    // --- 輔助函數 ---
     function getTagColor(t) {
         let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
         const hue = Math.abs(h) % 360;
@@ -247,7 +254,7 @@
 
     function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
     function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
-    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.0`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
+    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.1`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
     function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; refreshUI(); }
     function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
