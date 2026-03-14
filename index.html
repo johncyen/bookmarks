@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v4.2 - Backup Ready</title>
+    <title>智聯書籤系統 v4.3 - Drag & Drop Fixed</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
@@ -24,9 +24,9 @@
         .tag-del-btn { margin-left: 8px; color: var(--gray); font-size: 16px; font-weight: bold; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         .tag-del-btn:hover { background: var(--danger); color: white; }
         .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); overflow: hidden; }
-        .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; }
-        .folder-children { min-height: 20px; padding: 5px 5px 10px 20px; background: white; }
-        .link-node { padding: 10px 15px; margin: 6px 0; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; background: white; }
+        .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; cursor: move; }
+        .folder-children { min-height: 25px; padding: 5px 5px 10px 20px; background: white; border: 1px dashed #eee; margin: 5px; }
+        .link-node { padding: 10px 15px; margin: 6px 0; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; background: white; cursor: move; }
         .link-node a { flex-grow: 1; text-decoration: none; color: var(--primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tag-item { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 5px; font-weight: bold; border: 1px solid rgba(0,0,0,0.1); }
         #editModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
@@ -43,7 +43,7 @@
 <div class="container">
     <div class="header-bar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.2</span></h1>
+            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.3</span></h1>
             <div id="syncStatus" class="status-badge">載入中...</div>
         </div>
         <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤..." oninput="refreshUI()">
@@ -58,7 +58,7 @@
 
     <div id="tagPanel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div><strong>標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
+            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
             <span style="cursor:pointer; color:var(--primary); font-size:12px;" onclick="clearFilter()">清除過濾 ×</span>
         </div>
         <div id="tagCloud" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
@@ -74,7 +74,7 @@
         <label>名稱</label><input type="text" id="editName">
         <div id="linkFields">
             <label>網址</label><input type="text" id="editUrl">
-            <label>標籤</label>
+            <label>標籤 (點選下方快速加入)</label>
             <input type="text" id="editTags">
             <div id="tagPicker" class="tag-picker-container"></div>
         </div>
@@ -111,28 +111,7 @@
         } catch (e) { updateStatus("❌ 載入失敗", "danger"); }
     }
 
-    // --- 新功能：匯出 JSON 備份 ---
-    function exportBackup() {
-        const backupData = {
-            appName: "SmartBookmark",
-            version: "v4.2",
-            exportDate: new Date().toLocaleString(),
-            revision: currentVersion,
-            definedTags: definedTags,
-            bookmarks: bookmarkTree
-        };
-        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        const dateStr = new Date().toISOString().slice(0, 10);
-        a.href = url;
-        a.download = `Bookmark_Backup_${dateStr}_rev${currentVersion}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
+    // --- 同步雲端 ---
     async function syncToCloud() {
         if (isSyncing) return;
         isSyncing = true;
@@ -152,12 +131,73 @@
         finally { isSyncing = false; updateVersionDisplay(); }
     }
 
+    // --- 重要：拖拽後重新掃描整個 DOM 結構並存檔 ---
+    function saveTreeFromUI() {
+        const root = document.getElementById('tree-root');
+        bookmarkTree = serializeContainer(root);
+        currentVersion++;
+        syncToCloud();
+    }
+
+    function serializeContainer(container) {
+        const items = [];
+        Array.from(container.children).forEach(el => {
+            const nodeId = el.dataset.id;
+            const originalNode = findNode(bookmarkTree, nodeId);
+            if (!originalNode) return;
+
+            const newNode = { ...originalNode };
+            if (newNode.type === 'folder') {
+                const subContainer = el.querySelector('.folder-children');
+                newNode.children = serializeContainer(subContainer);
+            }
+            items.push(newNode);
+        });
+        return items;
+    }
+
     function refreshUI() {
         render(bookmarkTree, document.getElementById('tree-root'), document.getElementById('searchInput').value, activeTag);
         updateTagCloud();
         updateVersionDisplay();
     }
 
+    function render(nodes, container, keyword = "", tagFilter = null) {
+        container.innerHTML = '';
+        const kw = keyword.toLowerCase();
+        nodes.forEach(node => {
+            const matchText = node.name.toLowerCase().includes(kw) || (node.url && node.url.toLowerCase().includes(kw));
+            const matchTag = tagFilter ? (node.tags && node.tags.includes(tagFilter)) : true;
+            
+            const el = document.createElement('div');
+            el.dataset.id = node.id;
+            
+            if (node.type === 'folder') {
+                el.className = 'folder-node';
+                el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
+                render(node.children, el.querySelector('.folder-children'), keyword, tagFilter);
+                if ((keyword || tagFilter) && el.querySelector('.folder-children').innerHTML === '' && !matchText) return;
+                container.appendChild(el);
+            } else {
+                if ((keyword || tagFilter) && !(matchText && matchTag)) return;
+                el.className = 'link-node';
+                const tagsH = (node.tags || []).map(t => { const c = getTagColor(t); return `<span class="tag-item" style="background:${c.bg}; color:${c.text}; border-color:${c.border}">#${t}</span>`; }).join('');
+                el.innerHTML = `<a href="${node.url}" target="_blank">🔗 ${node.name}</a>${tagsH}<div style="margin-left:10px;"><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div>`;
+                container.appendChild(el);
+            }
+        });
+        
+        // 重新初始化 Sortable 並綁定同步
+        new Sortable(container, {
+            group: 'nested',
+            animation: 150,
+            fallbackOnBody: true,
+            swapThreshold: 0.65,
+            onEnd: () => { saveTreeFromUI(); }
+        });
+    }
+
+    // --- 標籤功能 ---
     function updateTagCloud() {
         const cloud = document.getElementById('tagCloud');
         cloud.innerHTML = '';
@@ -185,7 +225,7 @@
     }
 
     function deleteDefinedTag(tag, count) {
-        if (confirm(`確定刪除標籤「${tag}」的定義嗎？${count > 0 ? '\n注意：目前有 '+count+' 個書籤仍在使用此標籤。' : ''}`)) {
+        if (confirm(`確定刪除標籤「${tag}」？${count > 0 ? '\n仍有 '+count+' 個書籤在使用。' : ''}`)) {
             definedTags = definedTags.filter(t => t !== tag);
             currentVersion++; refreshUI(); syncToCloud();
         }
@@ -201,8 +241,9 @@
         }
     }
 
+    // --- 書籤與編輯視窗 ---
     function openLinkModalForNew() {
-        editingId = 'new_' + Date.now();
+        editingId = 'link_' + Date.now();
         document.getElementById('modalTitle').innerText = "🔗 新增書籤";
         document.getElementById('editName').value = "";
         document.getElementById('editUrl').value = "https://";
@@ -220,55 +261,6 @@
         };
         document.getElementById('editModal').style.display = 'flex';
     }
-
-    function deleteNode(id) {
-        const node = findNode(bookmarkTree, id);
-        if (!node || !confirm(`確定刪除「${node.name}」？`)) return;
-        const rm = (l) => {
-            const i = l.findIndex(n => n.id === id);
-            if (i > -1) { l.splice(i, 1); return true; }
-            return l.some(n => n.children && rm(n.children));
-        };
-        rm(bookmarkTree);
-        currentVersion++; refreshUI(); syncToCloud();
-    }
-
-    function getTagColor(t) {
-        let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
-        const hue = Math.abs(h) % 360;
-        return { bg: `hsl(${hue}, 80%, 95%)`, text: `hsl(${hue}, 80%, 25%)`, border: `hsl(${hue}, 80%, 85%)` };
-    }
-
-    function render(nodes, container, keyword = "", tagFilter = null) {
-        container.innerHTML = '';
-        const kw = keyword.toLowerCase();
-        nodes.forEach(node => {
-            const matchText = node.name.toLowerCase().includes(kw) || (node.url && node.url.toLowerCase().includes(kw));
-            const matchTag = tagFilter ? (node.tags && node.tags.includes(tagFilter)) : true;
-            if (node.type === 'folder') {
-                const el = document.createElement('div'); el.className = 'folder-node';
-                el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
-                render(node.children, el.querySelector('.folder-children'), keyword, tagFilter);
-                if ((keyword || tagFilter) && el.querySelector('.folder-children').innerHTML === '' && !matchText) return;
-                container.appendChild(el);
-            } else {
-                if ((keyword || tagFilter) && !(matchText && matchTag)) return;
-                const el = document.createElement('div'); el.className = 'link-node';
-                const tagsH = (node.tags || []).map(t => { const c = getTagColor(t); return `<span class="tag-item" style="background:${c.bg}; color:${c.text}; border-color:${c.border}">#${t}</span>`; }).join('');
-                el.innerHTML = `<a href="${node.url}" target="_blank">🔗 ${node.name}</a>${tagsH}<div style="margin-left:10px;"><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div>`;
-                container.appendChild(el);
-            }
-        });
-        new Sortable(container, { group: 'nested', animation: 150, onEnd: () => { currentVersion++; syncToCloud(); } });
-    }
-
-    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
-    function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
-    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.2`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
-    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; refreshUI(); }
-    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
-    function manualSync() { currentVersion++; syncToCloud(); }
 
     function openEditModal(id) {
         editingId = id; const n = findNode(bookmarkTree, id);
@@ -292,6 +284,37 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
+    // --- 工具函數 ---
+    function getTagColor(t) {
+        let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
+        const hue = Math.abs(h) % 360;
+        return { bg: `hsl(${hue}, 80%, 95%)`, text: `hsl(${hue}, 80%, 25%)`, border: `hsl(${hue}, 80%, 85%)` };
+    }
+
+    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
+    function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
+    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.3`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
+    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; refreshUI(); }
+    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+    function manualSync() { currentVersion++; syncToCloud(); }
+    function exportBackup() {
+        const data = { version: "v4.3", date: new Date().toLocaleString(), tags: definedTags, tree: bookmarkTree };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = `Bookmark_v4.3_${new Date().getTime()}.json`; a.click();
+    }
+    function addNewItem(type) {
+        const name = prompt(`名稱:`);
+        if (!name) return;
+        bookmarkTree.unshift({ id: 'f_' + Date.now(), type, name, children: [] });
+        currentVersion++; refreshUI(); syncToCloud();
+    }
+    function deleteNode(id) {
+        if (!confirm("確定刪除？")) return;
+        const rm = (l) => { const i = l.findIndex(n => n.id === id); if (i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
+        rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
+    }
     function renderTagPicker() {
         const picker = document.getElementById('tagPicker'); const input = document.getElementById('editTags');
         const current = input.value.split(',').map(t => t.trim()).filter(t => t);
@@ -305,13 +328,6 @@
             span.onclick = () => { const idx = current.indexOf(tag); if (idx === -1) current.push(tag); else current.splice(idx, 1); input.value = current.join(', '); renderTagPicker(); };
             picker.appendChild(span);
         });
-    }
-
-    function addNewItem(type) {
-        const name = prompt(`新資料夾名稱:`);
-        if (!name) return;
-        bookmarkTree.unshift({ id: 'f_' + Date.now(), type, name, children: [] });
-        currentVersion++; refreshUI(); syncToCloud();
     }
 
     init();
