@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 - v2.8</title>
+    <title>智聯書籤系統 v3.0 - Stable</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
@@ -22,12 +22,11 @@
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
 
-        /* Header & Search */
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
         .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 4px; background: #e2e8f0; color: var(--gray); font-weight: 600; }
+        
         .search-box { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; }
 
-        /* Controls */
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         button { cursor: pointer; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; transition: 0.2s; font-size: 14px; }
         .btn-add { background: var(--primary); color: white; }
@@ -35,16 +34,15 @@
         .btn-tag-toggle { background: var(--gray); color: white; }
         .btn-active-filter { background: #f59e0b; color: white; }
 
-        /* 標籤面板 (補回新增功能) */
+        /* 1. 標籤管理面板 (確認保留) */
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
         .tag-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
         .tag-pill { background: white; border: 1px solid #cbd5e1; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; }
         .tag-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
         .tag-count { font-size: 10px; opacity: 0.5; margin-left: 5px; }
-        .btn-tag-new { background: #e2e8f0; color: #475569; padding: 4px 10px; font-size: 12px; border-radius: 4px; border: 1px solid #cbd5e1; }
 
-        /* List Items */
+        /* 內容列表樣式 */
         .folder-node { margin: 15px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); }
         .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; cursor: pointer; }
         .folder-children { min-height: 30px; padding: 5px 5px 15px 25px; background: white; border-top: 1px solid #f1f5f9; }
@@ -55,7 +53,7 @@
         .link-node:hover .action-btns, .folder-header:hover .action-btns { opacity: 1; }
         .btn-icon { background: none; color: var(--gray); font-size: 16px; padding: 2px; }
 
-        /* Edit Modal */
+        /* 編輯彈窗 */
         #editModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; }
         .form-group { margin-bottom: 15px; }
@@ -71,12 +69,12 @@
 
 <div class="container">
     <div class="header-bar">
-        <h1>智聯書籤系統 <span id="verDisplay" style="font-size: 14px; color: var(--gray);">v2.8</span></h1>
-        <div id="syncStatus" class="status-badge">同步中...</div>
-        <input type="text" id="searchInput" class="search-box" placeholder="搜尋..." oninput="refreshUI()">
+        <h1>智聯書籤系統 <span id="verDisplay" style="font-size: 14px; color: var(--gray);">v3.0</span></h1>
+        <div id="syncStatus" class="status-badge">系統初始化...</div>
+        <input type="text" id="searchInput" class="search-box" placeholder="搜尋書籤或標籤..." oninput="refreshUI()">
         <div class="controls">
-            <button class="btn-add" onclick="addNewItem('folder')">📁 新增資料夾</button>
-            <button class="btn-add" onclick="addNewItem('link')">🔗 新增書籤</button>
+            <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
+            <button class="btn-add" onclick="addNewItem('link')">🔗 書籤</button>
             <button id="tagBtn" class="btn-tag-toggle" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
             <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
         </div>
@@ -86,7 +84,7 @@
         <div class="tag-panel-header">
             <div>
                 <span style="font-weight: bold; color: var(--gray);">標籤雲管理</span>
-                <button class="btn-tag-new" style="margin-left: 10px;" onclick="createStandaloneTag()">➕ 新增標籤</button>
+                <button style="margin-left:10px; padding: 4px 8px; font-size:12px; border:1px solid #ccc; border-radius:4px;" onclick="createStandaloneTag()">➕ 新增標籤</button>
             </div>
             <span style="cursor:pointer; color: var(--primary); font-size: 13px;" onclick="clearFilter()">清除過濾</span>
         </div>
@@ -110,7 +108,7 @@
         </div>
         <div class="modal-footer">
             <button onclick="closeEditModal()" style="background:#eee">取消</button>
-            <button onclick="saveEdit()" style="background:var(--primary); color:white">儲存變更</button>
+            <button onclick="saveEdit()" style="background:var(--primary); color:white">確認儲存</button>
         </div>
     </div>
 </div>
@@ -122,7 +120,7 @@
 
     let bookmarkTree = [];
     let activeTag = null;
-    let definedTags = new Set(); 
+    let definedTags = new Set();
     let currentVersion = 0;
     let editingId = null;
     const rootEl = document.getElementById('tree-root');
@@ -135,10 +133,9 @@
                 bookmarkTree = data[0].tree_json;
                 currentVersion = data[0].version || 0;
             }
-            updateVersionDisplay();
             refreshUI();
-            updateStatus("✅ 連線成功", "success");
-        } catch (err) { updateStatus("❌ 失敗", "danger"); }
+            updateStatus("✅ 同步完成", "success");
+        } catch (err) { updateStatus("❌ 連線失敗", "danger"); }
     }
 
     // --- 標籤雲邏輯 ---
@@ -149,18 +146,15 @@
     }
 
     function createStandaloneTag() {
-        const t = prompt("請輸入新標籤名稱:");
-        if (t && t.trim()) {
-            definedTags.add(t.trim());
-            updateTagCloud();
-        }
+        const t = prompt("預定義標籤名稱:");
+        if (t && t.trim()) { definedTags.add(t.trim()); updateTagCloud(); }
     }
 
     function updateTagCloud() {
         const tagsMap = {};
         const scan = (nodes) => {
             nodes.forEach(n => {
-                if (n.tags) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1);
+                if (n.tags && Array.isArray(n.tags)) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1);
                 if (n.children) scan(n.children);
             });
         };
@@ -178,20 +172,10 @@
         });
     }
 
-    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
-
-    function updateVersionDisplay() {
-        document.getElementById('verDisplay').innerText = `v${(2.8 + currentVersion * 0.01).toFixed(2)}`;
-        document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`;
-    }
-
-    // --- UI 渲染 ---
+    // --- UI 渲染邏輯 ---
     function refreshUI() {
-        const kw = document.getElementById('searchInput').value;
-        const btn = document.getElementById('tagBtn');
-        btn.className = activeTag ? 'btn-tag-toggle btn-active-filter' : 'btn-tag-toggle';
-        btn.innerText = activeTag ? `🏷️ 過濾: ${activeTag}` : `🏷️ 標籤管理`;
-        render(bookmarkTree, rootEl, kw, activeTag);
+        render(bookmarkTree, rootEl, document.getElementById('searchInput').value, activeTag);
+        updateVersionDisplay();
         if (document.getElementById('tagPanel').style.display === 'block') updateTagCloud();
     }
 
@@ -201,19 +185,22 @@
         nodes.forEach(node => {
             const isTagMatch = tagFilter ? (node.tags && node.tags.includes(tagFilter)) : true;
             const isTextMatch = node.name.toLowerCase().includes(kw) || (node.url && node.url.toLowerCase().includes(kw));
+
             if (node.type === 'folder') {
                 const el = document.createElement('div');
                 el.className = 'folder-node';
                 el.dataset.id = node.id; el.dataset.type = 'folder'; el.dataset.name = node.name;
                 el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div class="action-btns"><button class="btn-icon" onclick="openEditModal('${node.id}')">✏️</button><button class="btn-icon" onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
-                render(node.children, el.querySelector('.folder-children'), keyword, tagFilter);
-                if ((keyword || tagFilter) && el.querySelector('.folder-children').innerHTML === '' && !isTextMatch) return;
+                const childWrap = el.querySelector('.folder-children');
+                render(node.children, childWrap, keyword, tagFilter);
+                if ((keyword || tagFilter) && childWrap.innerHTML === '' && !isTextMatch) return;
                 container.appendChild(el);
             } else {
                 if ((keyword || tagFilter) && !(isTextMatch && isTagMatch)) return;
                 const el = document.createElement('div');
                 el.className = 'link-node';
-                el.dataset.id = node.id; el.dataset.type = 'link'; el.dataset.name = node.name; el.dataset.url = node.url; el.dataset.tags = JSON.stringify(node.tags || []);
+                el.dataset.id = node.id; el.dataset.type = 'link'; el.dataset.name = node.name;
+                el.dataset.url = node.url; el.dataset.tags = JSON.stringify(node.tags || []);
                 const tagsHtml = (node.tags || []).map(t => `<span class="tag-item">#${t}</span>`).join('');
                 el.innerHTML = `<span>🔗</span><a href="${node.url}" target="_blank">${node.name}</a><div style="display:flex">${tagsHtml}</div><div class="action-btns"><button class="btn-icon" onclick="openEditModal('${node.id}')">✏️</button><button class="btn-icon" onclick="deleteNode('${node.id}')">🗑️</button></div>`;
                 container.appendChild(el);
@@ -236,8 +223,6 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; editingId = null; }
-
     function saveEdit() {
         const n = findNode(bookmarkTree, editingId);
         if (n) {
@@ -246,49 +231,58 @@
                 n.url = document.getElementById('editUrl').value;
                 n.tags = document.getElementById('editTags').value.split(',').map(x => x.trim()).filter(x => x !== "");
             }
-            currentVersion++;
-            refreshUI(); syncToCloud(); closeEditModal();
+            currentVersion++; refreshUI(); syncToCloud(); closeEditModal();
         }
     }
 
-    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
+    // --- 同步與持久化核心 ---
+    function buildDataFromUI(c) {
+        return Array.from(c.children).map(el => {
+            const n = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
+            if (n.type === 'folder') {
+                n.children = buildDataFromUI(el.querySelector('.folder-children'));
+            } else {
+                n.url = el.dataset.url;
+                n.tags = JSON.parse(el.dataset.tags || "[]"); // 確保標籤被正確讀取
+            }
+            return n;
+        });
+    }
 
     async function syncToCloud() {
         updateStatus("🔄 同步中...", "info");
         const data = buildDataFromUI(rootEl);
         const { error } = await supabaseClient.from('bookmark_data').upsert({ id: 1, tree_json: data, version: currentVersion, updated_at: new Date() });
-        if (!error) { updateStatus("✅ 同步完成", "success"); bookmarkTree = data; updateVersionDisplay(); }
+        if (!error) { 
+            updateStatus("✅ v" + currentVersion + " 已同步", "success"); 
+            bookmarkTree = data; 
+            updateVersionDisplay(); 
+        }
     }
 
-    function buildDataFromUI(c) {
-        return Array.from(c.children).map(el => {
-            const n = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
-            if (n.type === 'folder') n.children = buildDataFromUI(el.querySelector('.folder-children'));
-            else { n.url = el.dataset.url; n.tags = JSON.parse(el.dataset.tags || "[]"); }
-            return n;
-        });
-    }
-
-    function setupSortable() { document.querySelectorAll('.folder-children').forEach(el => { new Sortable(el, { group: 'nested', animation: 150, ghostClass: 'ghost', onEnd: syncToCloud }); }); }
-
+    // 其他輔助函數
+    function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
+    function setupSortable() { document.querySelectorAll('.folder-children').forEach(el => { new Sortable(el, { group: 'nested', animation: 150, onEnd: syncToCloud }); }); }
     function addNewItem(type) {
-        const name = prompt("名稱:");
-        if (!name) return;
+        const name = prompt("輸入名稱:"); if (!name) return;
         const newItem = { id: 'idx_' + Date.now(), type: type, name: name };
         if (type === 'link') { newItem.url = "https://"; newItem.tags = []; }
         else newItem.children = [];
-        bookmarkTree.unshift(newItem);
-        currentVersion++; refreshUI(); syncToCloud();
+        bookmarkTree.unshift(newItem); currentVersion++; refreshUI(); syncToCloud();
     }
-
     function deleteNode(id) {
         if (confirm("確定刪除？")) {
             const rm = (l) => { const i = l.findIndex(n => n.id === id); if (i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
             rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
         }
     }
-
+    function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
+    function updateVersionDisplay() { 
+        document.getElementById('verDisplay').innerText = `v${(3.0 + currentVersion * 0.01).toFixed(2)}`;
+        document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`;
+    }
     function updateStatus(t, s) { statusEl.innerText = t; statusEl.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
+    function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     function manualSync() { syncToCloud(); }
 
     init();
