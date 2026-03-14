@@ -3,31 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v4.3 - Drag & Drop Fixed</title>
+    <title>智聯書籤系統 v4.4 - Connectivity Checker</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; --backup: #8b5cf6; }
+        :root { --primary: #2563eb; --bg: #f1f5f9; --text: #1e293b; --folder-bg: #f8fafc; --gray: #64748b; --danger: #ef4444; --success: #10b981; --backup: #8b5cf6; }
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
+        .container { max-width: 950px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
         .status-badge { font-size: 12px; padding: 4px 12px; border-radius: 4px; background: #e2e8f0; color: var(--gray); font-weight: 600; min-width: 90px; text-align: center; display: inline-block; }
         .search-box { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 14px; font-weight: 600; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 4px; }
         .btn-add { background: var(--primary); color: white; }
-        .btn-sync { background: #10b981; color: white; }
+        .btn-sync { background: var(--success); color: white; }
         .btn-backup { background: var(--backup); color: white; }
+        .btn-check { background: #f1f5f9; color: var(--gray); font-size: 11px; padding: 4px 8px; }
+        
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; animation: fadeIn 0.3s; }
         .tag-pill { display: flex; align-items: center; border: 1px solid transparent; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; transition: 0.3s; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .tag-pill.active { border-color: #333 !important; transform: scale(1.05); font-weight: bold; }
-        .tag-del-btn { margin-left: 8px; color: var(--gray); font-size: 16px; font-weight: bold; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .tag-del-btn { margin-left: 8px; color: var(--gray); font-size: 16px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         .tag-del-btn:hover { background: var(--danger); color: white; }
+
         .folder-node { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); overflow: hidden; }
         .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; cursor: move; }
-        .folder-children { min-height: 25px; padding: 5px 5px 10px 20px; background: white; border: 1px dashed #eee; margin: 5px; }
+        .folder-children { min-height: 30px; padding: 5px 5px 10px 20px; background: white; border-top: 1px solid #f1f5f9; }
+        
         .link-node { padding: 10px 15px; margin: 6px 0; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; background: white; cursor: move; }
         .link-node a { flex-grow: 1; text-decoration: none; color: var(--primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; background: #ccc; display: inline-block; }
+        .status-online { background: var(--success); box-shadow: 0 0 5px var(--success); }
+        .status-offline { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+        
         .tag-item { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 5px; font-weight: bold; border: 1px solid rgba(0,0,0,0.1); }
         #editModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; }
@@ -43,13 +52,13 @@
 <div class="container">
     <div class="header-bar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.3</span></h1>
+            <h1 style="margin:0; font-size:24px;">智聯書籤系統 <span id="verDisplay" style="font-size:12px; color:var(--gray);">v4.4</span></h1>
             <div id="syncStatus" class="status-badge">載入中...</div>
         </div>
         <input type="text" id="searchInput" class="search-box" placeholder="搜尋關鍵字或標籤..." oninput="refreshUI()">
         <div class="controls">
-            <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
-            <button class="btn-add" onclick="openLinkModalForNew()">🔗 書籤</button>
+            <button class="btn-add" onclick="addNewItem('folder')">📁 新增資料夾</button>
+            <button class="btn-add" onclick="openLinkModalForNew()">🔗 新增書籤</button>
             <button style="background:#64748b; color:white;" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
             <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
             <button class="btn-backup" onclick="exportBackup()">💾 匯出備份</button>
@@ -58,7 +67,7 @@
 
     <div id="tagPanel">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤</button></div>
+            <div><strong>全域標籤池</strong><button style="margin-left:10px; font-size:11px; padding:4px 8px;" onclick="createStandaloneTag()">➕ 新增標籤定義</button></div>
             <span style="cursor:pointer; color:var(--primary); font-size:12px;" onclick="clearFilter()">清除過濾 ×</span>
         </div>
         <div id="tagCloud" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
@@ -111,7 +120,29 @@
         } catch (e) { updateStatus("❌ 載入失敗", "danger"); }
     }
 
-    // --- 同步雲端 ---
+    // --- 核心：檢查連結存活狀態 ---
+    async function checkLinkStatus(url, elementId) {
+        const dot = document.querySelector(`[data-id="${elementId}"] .status-dot`);
+        if (!dot) return;
+        
+        dot.style.background = "#fbbf24"; // 檢測中黃色
+        dot.className = "status-dot";
+
+        try {
+            // 使用 no-cors 模式嘗試抓取，雖拿不到內容但可知道是否連得上
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            await fetch(url, { mode: 'no-cors', signal: controller.signal });
+            
+            clearTimeout(timeoutId);
+            dot.classList.add('status-online');
+        } catch (e) {
+            dot.classList.add('status-offline');
+        }
+    }
+
+    // --- 同步與結構保存 ---
     async function syncToCloud() {
         if (isSyncing) return;
         isSyncing = true;
@@ -126,15 +157,12 @@
             });
             if (error) throw error;
             updateStatus("✅ 已同步", "success");
-            setTimeout(() => { if(!isSyncing) updateStatus("就緒", "info"); }, 2000);
         } catch (err) { updateStatus(`❌ 錯誤: ${err.message}`, "danger"); }
         finally { isSyncing = false; updateVersionDisplay(); }
     }
 
-    // --- 重要：拖拽後重新掃描整個 DOM 結構並存檔 ---
     function saveTreeFromUI() {
-        const root = document.getElementById('tree-root');
-        bookmarkTree = serializeContainer(root);
+        bookmarkTree = serializeContainer(document.getElementById('tree-root'));
         currentVersion++;
         syncToCloud();
     }
@@ -145,11 +173,9 @@
             const nodeId = el.dataset.id;
             const originalNode = findNode(bookmarkTree, nodeId);
             if (!originalNode) return;
-
             const newNode = { ...originalNode };
             if (newNode.type === 'folder') {
-                const subContainer = el.querySelector('.folder-children');
-                newNode.children = serializeContainer(subContainer);
+                newNode.children = serializeContainer(el.querySelector('.folder-children'));
             }
             items.push(newNode);
         });
@@ -182,19 +208,19 @@
                 if ((keyword || tagFilter) && !(matchText && matchTag)) return;
                 el.className = 'link-node';
                 const tagsH = (node.tags || []).map(t => { const c = getTagColor(t); return `<span class="tag-item" style="background:${c.bg}; color:${c.text}; border-color:${c.border}">#${t}</span>`; }).join('');
-                el.innerHTML = `<a href="${node.url}" target="_blank">🔗 ${node.name}</a>${tagsH}<div style="margin-left:10px;"><button onclick="openEditModal('${node.id}')">✏️</button><button onclick="deleteNode('${node.id}')">🗑️</button></div>`;
+                el.innerHTML = `
+                    <span class="status-dot"></span>
+                    <a href="${node.url}" target="_blank">${node.name}</a>
+                    ${tagsH}
+                    <div style="margin-left:10px; display:flex; gap:4px;">
+                        <button class="btn-check" onclick="checkLinkStatus('${node.url}', '${node.id}')">📡 檢測</button>
+                        <button onclick="openEditModal('${node.id}')">✏️</button>
+                        <button onclick="deleteNode('${node.id}')">🗑️</button>
+                    </div>`;
                 container.appendChild(el);
             }
         });
-        
-        // 重新初始化 Sortable 並綁定同步
-        new Sortable(container, {
-            group: 'nested',
-            animation: 150,
-            fallbackOnBody: true,
-            swapThreshold: 0.65,
-            onEnd: () => { saveTreeFromUI(); }
-        });
+        new Sortable(container, { group: 'nested', animation: 150, onEnd: () => saveTreeFromUI() });
     }
 
     // --- 標籤功能 ---
@@ -225,14 +251,14 @@
     }
 
     function deleteDefinedTag(tag, count) {
-        if (confirm(`確定刪除標籤「${tag}」？${count > 0 ? '\n仍有 '+count+' 個書籤在使用。' : ''}`)) {
+        if (confirm(`確定移除標籤「${tag}」定義？${count > 0 ? '\n尚有 '+count+' 個書籤在使用。' : ''}`)) {
             definedTags = definedTags.filter(t => t !== tag);
             currentVersion++; refreshUI(); syncToCloud();
         }
     }
 
     function createStandaloneTag() {
-        const t = prompt("輸入新標籤名稱:");
+        const t = prompt("新標籤定義名稱:");
         if (t && t.trim()) {
             if (!definedTags.includes(t.trim())) {
                 definedTags.push(t.trim());
@@ -241,18 +267,15 @@
         }
     }
 
-    // --- 書籤與編輯視窗 ---
+    // --- 視窗操作 ---
     function openLinkModalForNew() {
         editingId = 'link_' + Date.now();
         document.getElementById('modalTitle').innerText = "🔗 新增書籤";
-        document.getElementById('editName').value = "";
-        document.getElementById('editUrl').value = "https://";
-        document.getElementById('editTags').value = "";
-        document.getElementById('linkFields').style.display = 'block';
+        document.getElementById('editName').value = ""; document.getElementById('editUrl').value = "https://";
+        document.getElementById('editTags').value = ""; document.getElementById('linkFields').style.display = 'block';
         renderTagPicker();
         document.getElementById('saveBtn').onclick = () => {
-            const name = document.getElementById('editName').value;
-            const url = document.getElementById('editUrl').value;
+            const name = document.getElementById('editName').value; const url = document.getElementById('editUrl').value;
             if (!name) return;
             const tags = document.getElementById('editTags').value.split(',').map(x => x.trim()).filter(x => x);
             bookmarkTree.unshift({ id: editingId, type: 'link', name, url, tags });
@@ -284,35 +307,33 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
-    // --- 工具函數 ---
+    // --- 工具 ---
     function getTagColor(t) {
         let h = 0; for (let i = 0; i < t.length; i++) h = t.charCodeAt(i) + ((h << 5) - h);
         const hue = Math.abs(h) % 360;
         return { bg: `hsl(${hue}, 80%, 95%)`, text: `hsl(${hue}, 80%, 25%)`, border: `hsl(${hue}, 80%, 85%)` };
     }
-
     function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
     function updateStatus(t, s) { const el = document.getElementById('syncStatus'); el.innerText = t; el.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
-    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.3`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
-    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; refreshUI(); }
+    function updateVersionDisplay() { document.getElementById('verDisplay').innerText = `v4.4`; document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`; }
+    function toggleTagPanel() { const p = document.getElementById('tagPanel'); p.style.display = (p.style.display === 'block') ? 'none' : 'block'; }
     function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
     function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
     function manualSync() { currentVersion++; syncToCloud(); }
     function exportBackup() {
-        const data = { version: "v4.3", date: new Date().toLocaleString(), tags: definedTags, tree: bookmarkTree };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-        a.download = `Bookmark_v4.3_${new Date().getTime()}.json`; a.click();
+        const d = { ver: "v4.4", date: new Date().toLocaleString(), tree: bookmarkTree, tags: definedTags };
+        const b = new Blob([JSON.stringify(d, null, 2)], {type:"application/json"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(b);
+        a.download = `Bookmark_Backup_v4.4_${new Date().getTime()}.json`; a.click();
     }
     function addNewItem(type) {
-        const name = prompt(`名稱:`);
-        if (!name) return;
-        bookmarkTree.unshift({ id: 'f_' + Date.now(), type, name, children: [] });
+        const name = prompt("資料夾名稱:"); if(!name) return;
+        bookmarkTree.unshift({ id: 'f_'+Date.now(), type, name, children: [] });
         currentVersion++; refreshUI(); syncToCloud();
     }
     function deleteNode(id) {
-        if (!confirm("確定刪除？")) return;
-        const rm = (l) => { const i = l.findIndex(n => n.id === id); if (i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
+        if(!confirm("確定刪除此項目？")) return;
+        const rm = (l) => { const i = l.findIndex(n => n.id === id); if(i > -1) { l.splice(i, 1); return true; } return l.some(n => n.children && rm(n.children)); };
         rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
     }
     function renderTagPicker() {
@@ -325,7 +346,11 @@
             const isSel = current.includes(tag);
             Object.assign(span.style, { backgroundColor: c.bg, color: c.text, border: isSel ? `2px solid ${c.text}` : `1px solid ${c.border}`, fontWeight: isSel ? 'bold' : 'normal' });
             span.innerText = tag;
-            span.onclick = () => { const idx = current.indexOf(tag); if (idx === -1) current.push(tag); else current.splice(idx, 1); input.value = current.join(', '); renderTagPicker(); };
+            span.onclick = () => {
+                const idx = current.indexOf(tag);
+                if (idx === -1) current.push(tag); else current.splice(idx, 1);
+                input.value = current.join(', '); renderTagPicker();
+            };
             picker.appendChild(span);
         });
     }
