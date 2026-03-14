@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智聯書籤系統 v3.0 - Stable</title>
+    <title>智聯書籤系統 v3.2 - Color Management</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
@@ -12,8 +12,6 @@
             --bg: #f1f5f9;
             --text: #1e293b;
             --folder-bg: #f8fafc;
-            --tag-bg: #e0f2fe;
-            --tag-text: #0369a1;
             --danger: #ef4444;
             --success: #10b981;
             --gray: #64748b;
@@ -22,9 +20,9 @@
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); position: relative; min-height: 600px; }
 
+        /* Header & Search */
         .header-bar { border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
         .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 4px; background: #e2e8f0; color: var(--gray); font-weight: 600; }
-        
         .search-box { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; }
 
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
@@ -32,59 +30,65 @@
         .btn-add { background: var(--primary); color: white; }
         .btn-sync { background: var(--success); color: white; }
         .btn-tag-toggle { background: var(--gray); color: white; }
-        .btn-active-filter { background: #f59e0b; color: white; }
 
-        /* 1. 標籤管理面板 (確認保留) */
+        /* 標籤管理面板 (保留功能) */
         #tagPanel { display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
         .tag-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
-        .tag-pill { background: white; border: 1px solid #cbd5e1; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; }
-        .tag-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
-        .tag-count { font-size: 10px; opacity: 0.5; margin-left: 5px; }
+        
+        /* 動態彩色標籤樣式 */
+        .tag-pill { border: 1px solid transparent; padding: 4px 12px; border-radius: 99px; font-size: 13px; cursor: pointer; transition: 0.3s; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tag-pill.active { border-color: #333; transform: scale(1.05); font-weight: bold; }
+        .tag-count { font-size: 10px; opacity: 0.7; margin-left: 5px; }
 
-        /* 內容列表樣式 */
+        /* 列表節點 */
         .folder-node { margin: 15px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: var(--folder-bg); }
         .folder-header { padding: 10px 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; cursor: pointer; }
         .folder-children { min-height: 30px; padding: 5px 5px 15px 25px; background: white; border-top: 1px solid #f1f5f9; }
         .link-node { padding: 10px 15px; margin: 6px 0; border: 1px solid #f1f5f9; border-radius: 8px; display: flex; align-items: center; background: white; }
         .link-node a { flex-grow: 1; text-decoration: none; color: var(--primary); font-weight: 500; }
-        .tag-item { background: var(--tag-bg); color: var(--tag-text); font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-weight: bold; }
+        
+        /* 書籤內標籤樣式 */
+        .tag-item { font-size: 10px; padding: 2px 8px; border-radius: 4px; margin-left: 4px; font-weight: bold; border: 1px solid rgba(0,0,0,0.1); }
+
         .action-btns { display: flex; gap: 8px; opacity: 0.2; margin-left: 10px; }
         .link-node:hover .action-btns, .folder-header:hover .action-btns { opacity: 1; }
         .btn-icon { background: none; color: var(--gray); font-size: 16px; padding: 2px; }
 
-        /* 編輯彈窗 */
+        /* 編輯彈窗與選取器 (保留點選功能) */
         #editModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 450px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: var(--gray); }
         .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        
+        .tag-picker-container { display: flex; flex-wrap: wrap; gap: 5px; max-height: 120px; overflow-y: auto; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px dashed #cbd5e1; }
+        .picker-tag { padding: 3px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid transparent; }
 
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .version-info { font-size: 11px; color: #cbd5e1; text-align: right; margin-top: 20px; }
-        .ghost { opacity: 0.2; background: #dbeafe !important; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header-bar">
-        <h1>智聯書籤系統 <span id="verDisplay" style="font-size: 14px; color: var(--gray);">v3.0</span></h1>
-        <div id="syncStatus" class="status-badge">系統初始化...</div>
+        <h1>智聯書籤系統 <span id="verDisplay">v3.2</span></h1>
+        <div id="syncStatus" class="status-badge">同步中...</div>
         <input type="text" id="searchInput" class="search-box" placeholder="搜尋書籤或標籤..." oninput="refreshUI()">
         <div class="controls">
-            <button class="btn-add" onclick="addNewItem('folder')">📁 資料夾</button>
-            <button class="btn-add" onclick="addNewItem('link')">🔗 書籤</button>
+            <button class="btn-add" onclick="addNewItem('folder')">📁 新增資料夾</button>
+            <button class="btn-add" onclick="addNewItem('link')">🔗 新增書籤</button>
             <button id="tagBtn" class="btn-tag-toggle" onclick="toggleTagPanel()">🏷️ 標籤管理</button>
-            <button class="btn-sync" onclick="manualSync()">☁️ 同步雲端</button>
+            <button class="btn-sync" onclick="manualSync()">☁️ 手動同步</button>
         </div>
     </div>
 
     <div id="tagPanel">
         <div class="tag-panel-header">
             <div>
-                <span style="font-weight: bold; color: var(--gray);">標籤雲管理</span>
-                <button style="margin-left:10px; padding: 4px 8px; font-size:12px; border:1px solid #ccc; border-radius:4px;" onclick="createStandaloneTag()">➕ 新增標籤</button>
+                <span style="font-weight: bold; color: var(--gray);">標籤色彩雲</span>
+                <button style="margin-left:10px; padding: 4px 8px; font-size:11px; border:1px solid #ccc; border-radius:4px; background:white;" onclick="createStandaloneTag()">➕ 新增標籤</button>
             </div>
             <span style="cursor:pointer; color: var(--primary); font-size: 13px;" onclick="clearFilter()">清除過濾</span>
         </div>
@@ -97,18 +101,25 @@
 
 <div id="editModal">
     <div class="modal-content">
-        <h3 id="modalTitle" style="margin-top:0">編輯</h3>
+        <h3 id="modalTitle" style="margin-top:0">編輯書籤</h3>
         <div class="form-group">
             <label>名稱</label>
             <input type="text" id="editName">
         </div>
         <div id="linkFields">
-            <div class="form-group"><label>網址</label><input type="text" id="editUrl"></div>
-            <div class="form-group"><label>標籤 (逗號隔開)</label><input type="text" id="editTags"></div>
+            <div class="form-group">
+                <label>網址</label>
+                <input type="text" id="editUrl">
+            </div>
+            <div class="form-group">
+                <label>標籤管理 (點選下方既有標籤)</label>
+                <input type="text" id="editTags" placeholder="手動輸入或點選下方...">
+                <div id="tagPicker" class="tag-picker-container" style="margin-top:10px;"></div>
+            </div>
         </div>
         <div class="modal-footer">
             <button onclick="closeEditModal()" style="background:#eee">取消</button>
-            <button onclick="saveEdit()" style="background:var(--primary); color:white">確認儲存</button>
+            <button onclick="saveEdit()" style="background:var(--primary); color:white">儲存並同步</button>
         </div>
     </div>
 </div>
@@ -126,35 +137,39 @@
     const rootEl = document.getElementById('tree-root');
     const statusEl = document.getElementById('syncStatus');
 
+    // --- 色彩管理引擎：根據標籤名稱生成固定顏色 ---
+    function getTagColor(tagName) {
+        let hash = 0;
+        for (let i = 0; i < tagName.length; i++) {
+            hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        // 使用 HSL 確保顏色飽和度與明度適中，不會太暗或太刺眼
+        const h = Math.abs(hash) % 360;
+        return {
+            bg: `hsl(${h}, 70%, 90%)`,
+            text: `hsl(${h}, 70%, 25%)`,
+            border: `hsl(${h}, 70%, 75%)`
+        };
+    }
+
     async function init() {
         try {
-            const { data, error } = await supabaseClient.from('bookmark_data').select('*').eq('id', 1);
+            const { data } = await supabaseClient.from('bookmark_data').select('*').eq('id', 1);
             if (data && data[0]) {
                 bookmarkTree = data[0].tree_json;
                 currentVersion = data[0].version || 0;
             }
             refreshUI();
-            updateStatus("✅ 同步完成", "success");
-        } catch (err) { updateStatus("❌ 連線失敗", "danger"); }
+            updateStatus("✅ 雲端同步中", "success");
+        } catch (err) { updateStatus("❌ 連線異常", "danger"); }
     }
 
-    // --- 標籤雲邏輯 ---
-    function toggleTagPanel() {
-        const panel = document.getElementById('tagPanel');
-        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
-        if (panel.style.display === 'block') updateTagCloud();
-    }
-
-    function createStandaloneTag() {
-        const t = prompt("預定義標籤名稱:");
-        if (t && t.trim()) { definedTags.add(t.trim()); updateTagCloud(); }
-    }
-
+    // --- 標籤與選取器邏輯 (保留並優化) ---
     function updateTagCloud() {
         const tagsMap = {};
         const scan = (nodes) => {
             nodes.forEach(n => {
-                if (n.tags && Array.isArray(n.tags)) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1);
+                if (n.tags) n.tags.forEach(t => tagsMap[t] = (tagsMap[t] || 0) + 1);
                 if (n.children) scan(n.children);
             });
         };
@@ -164,15 +179,55 @@
         const cloud = document.getElementById('tagCloud');
         cloud.innerHTML = '';
         Object.keys(tagsMap).sort().forEach(tag => {
+            const colors = getTagColor(tag);
             const pill = document.createElement('div');
             pill.className = `tag-pill ${activeTag === tag ? 'active' : ''}`;
-            pill.innerHTML = `${tag} <span class="tag-count">${tagsMap[tag]}</span>`;
+            pill.style.backgroundColor = colors.bg;
+            pill.style.color = colors.text;
+            pill.style.borderColor = colors.border;
+            pill.innerHTML = `${tag} <span class="tag-count">(${tagsMap[tag]})</span>`;
             pill.onclick = () => { activeTag = (activeTag === tag) ? null : tag; refreshUI(); };
             cloud.appendChild(pill);
         });
     }
 
-    // --- UI 渲染邏輯 ---
+    function renderTagPicker() {
+        const picker = document.getElementById('tagPicker');
+        const input = document.getElementById('editTags');
+        const currentTags = input.value.split(',').map(t => t.trim()).filter(t => t !== "");
+        const allTags = getAllSystemTags();
+        
+        picker.innerHTML = '';
+        allTags.forEach(tag => {
+            const colors = getTagColor(tag);
+            const span = document.createElement('span');
+            span.className = 'picker-tag';
+            span.style.backgroundColor = colors.bg;
+            span.style.color = colors.text;
+            span.style.border = currentTags.includes(tag) ? `2px solid ${colors.text}` : `1px solid ${colors.border}`;
+            span.innerText = tag;
+            span.onclick = () => {
+                const idx = currentTags.indexOf(tag);
+                if (idx === -1) currentTags.push(tag);
+                else currentTags.splice(idx, 1);
+                input.value = currentTags.join(', ');
+                renderTagPicker();
+            };
+            picker.appendChild(span);
+        });
+    }
+
+    function getAllSystemTags() {
+        const tags = new Set();
+        const scan = (nodes) => {
+            nodes.forEach(n => { if (n.tags) n.tags.forEach(t => tags.add(t)); if (n.children) scan(n.children); });
+        };
+        scan(bookmarkTree);
+        definedTags.forEach(t => tags.add(t));
+        return Array.from(tags).sort();
+    }
+
+    // --- 介面渲染 ---
     function refreshUI() {
         render(bookmarkTree, rootEl, document.getElementById('searchInput').value, activeTag);
         updateVersionDisplay();
@@ -191,9 +246,8 @@
                 el.className = 'folder-node';
                 el.dataset.id = node.id; el.dataset.type = 'folder'; el.dataset.name = node.name;
                 el.innerHTML = `<div class="folder-header"><span>📂 ${node.name}</span><div class="action-btns"><button class="btn-icon" onclick="openEditModal('${node.id}')">✏️</button><button class="btn-icon" onclick="deleteNode('${node.id}')">🗑️</button></div></div><div class="folder-children"></div>`;
-                const childWrap = el.querySelector('.folder-children');
-                render(node.children, childWrap, keyword, tagFilter);
-                if ((keyword || tagFilter) && childWrap.innerHTML === '' && !isTextMatch) return;
+                render(node.children, el.querySelector('.folder-children'), keyword, tagFilter);
+                if ((keyword || tagFilter) && el.querySelector('.folder-children').innerHTML === '' && !isTextMatch) return;
                 container.appendChild(el);
             } else {
                 if ((keyword || tagFilter) && !(isTextMatch && isTagMatch)) return;
@@ -201,7 +255,12 @@
                 el.className = 'link-node';
                 el.dataset.id = node.id; el.dataset.type = 'link'; el.dataset.name = node.name;
                 el.dataset.url = node.url; el.dataset.tags = JSON.stringify(node.tags || []);
-                const tagsHtml = (node.tags || []).map(t => `<span class="tag-item">#${t}</span>`).join('');
+                
+                const tagsHtml = (node.tags || []).map(t => {
+                    const colors = getTagColor(t);
+                    return `<span class="tag-item" style="background:${colors.bg}; color:${colors.text}; border-color:${colors.border}">#${t}</span>`;
+                }).join('');
+                
                 el.innerHTML = `<span>🔗</span><a href="${node.url}" target="_blank">${node.name}</a><div style="display:flex">${tagsHtml}</div><div class="action-btns"><button class="btn-icon" onclick="openEditModal('${node.id}')">✏️</button><button class="btn-icon" onclick="deleteNode('${node.id}')">🗑️</button></div>`;
                 container.appendChild(el);
             }
@@ -209,20 +268,35 @@
         setupSortable();
     }
 
-    // --- 編輯功能 ---
+    // --- 資料同步與管理 ---
+    async function syncToCloud() {
+        updateStatus("🔄 同步中...", "info");
+        const data = buildDataFromUI(rootEl);
+        const { error } = await supabaseClient.from('bookmark_data').upsert({ id: 1, tree_json: data, version: currentVersion, updated_at: new Date() });
+        if (!error) { updateStatus("✅ 同步完成", "success"); bookmarkTree = data; updateVersionDisplay(); }
+    }
+
+    function buildDataFromUI(c) {
+        return Array.from(c.children).map(el => {
+            const n = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
+            if (n.type === 'folder') n.children = buildDataFromUI(el.querySelector('.folder-children'));
+            else { n.url = el.dataset.url; n.tags = JSON.parse(el.dataset.tags || "[]"); }
+            return n;
+        });
+    }
+
+    // 其他基礎函數 (保留 v3.1 邏輯)
     function openEditModal(id) {
-        editingId = id;
-        const n = findNode(bookmarkTree, id);
-        if (!n) return;
+        editingId = id; const n = findNode(bookmarkTree, id); if (!n) return;
         document.getElementById('editName').value = n.name;
         if (n.type === 'link') {
             document.getElementById('linkFields').style.display = 'block';
             document.getElementById('editUrl').value = n.url;
             document.getElementById('editTags').value = (n.tags || []).join(', ');
+            renderTagPicker();
         } else { document.getElementById('linkFields').style.display = 'none'; }
         document.getElementById('editModal').style.display = 'flex';
     }
-
     function saveEdit() {
         const n = findNode(bookmarkTree, editingId);
         if (n) {
@@ -234,37 +308,10 @@
             currentVersion++; refreshUI(); syncToCloud(); closeEditModal();
         }
     }
-
-    // --- 同步與持久化核心 ---
-    function buildDataFromUI(c) {
-        return Array.from(c.children).map(el => {
-            const n = { id: el.dataset.id, type: el.dataset.type, name: el.dataset.name };
-            if (n.type === 'folder') {
-                n.children = buildDataFromUI(el.querySelector('.folder-children'));
-            } else {
-                n.url = el.dataset.url;
-                n.tags = JSON.parse(el.dataset.tags || "[]"); // 確保標籤被正確讀取
-            }
-            return n;
-        });
-    }
-
-    async function syncToCloud() {
-        updateStatus("🔄 同步中...", "info");
-        const data = buildDataFromUI(rootEl);
-        const { error } = await supabaseClient.from('bookmark_data').upsert({ id: 1, tree_json: data, version: currentVersion, updated_at: new Date() });
-        if (!error) { 
-            updateStatus("✅ v" + currentVersion + " 已同步", "success"); 
-            bookmarkTree = data; 
-            updateVersionDisplay(); 
-        }
-    }
-
-    // 其他輔助函數
     function findNode(l, id) { for (let n of l) { if (n.id === id) return n; if (n.children) { const f = findNode(n.children, id); if (f) return f; } } return null; }
     function setupSortable() { document.querySelectorAll('.folder-children').forEach(el => { new Sortable(el, { group: 'nested', animation: 150, onEnd: syncToCloud }); }); }
     function addNewItem(type) {
-        const name = prompt("輸入名稱:"); if (!name) return;
+        const name = prompt("名稱:"); if (!name) return;
         const newItem = { id: 'idx_' + Date.now(), type: type, name: name };
         if (type === 'link') { newItem.url = "https://"; newItem.tags = []; }
         else newItem.children = [];
@@ -276,9 +323,18 @@
             rm(bookmarkTree); currentVersion++; refreshUI(); syncToCloud();
         }
     }
+    function toggleTagPanel() {
+        const panel = document.getElementById('tagPanel');
+        panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+        if (panel.style.display === 'block') updateTagCloud();
+    }
+    function createStandaloneTag() {
+        const t = prompt("定義新標籤:");
+        if (t && t.trim()) { definedTags.add(t.trim()); updateTagCloud(); }
+    }
     function clearFilter() { activeTag = null; document.getElementById('searchInput').value = ''; refreshUI(); }
     function updateVersionDisplay() { 
-        document.getElementById('verDisplay').innerText = `v${(3.0 + currentVersion * 0.01).toFixed(2)}`;
+        document.getElementById('verDisplay').innerText = `v${(3.2 + currentVersion * 0.01).toFixed(2)}`;
         document.getElementById('footerVer').innerText = `Revision: ${currentVersion}`;
     }
     function updateStatus(t, s) { statusEl.innerText = t; statusEl.style.background = s === "success" ? "#dcfce7" : s === "danger" ? "#fee2e2" : "#e2e8f0"; }
